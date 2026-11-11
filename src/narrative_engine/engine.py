@@ -1,11 +1,11 @@
 from narrative_engine.domain.database import Database
-from narrative_engine.services.template_service import TemplateService
+from narrative_engine.services.narrative_template_service import NarrativeTemplateService
 
 
 class NarrativeEngine:
     def __init__(self, db_path: str = "narrative.db"):
         self.database = Database(db_path)
-        self.template_service = TemplateService(self.database)
+        self.narrative_template_service = NarrativeTemplateService(self.database)
 
     def initialize(self):
         self.database.migrate()
@@ -20,7 +20,7 @@ class NarrativeEngine:
         initial_situation: str,
         template_description: str | None = None,
     ):
-        return self.template_service.create(
+        return self.narrative_template_service.create(
             name=name,
             world_description=world_description,
             initial_situation=initial_situation,
@@ -28,13 +28,13 @@ class NarrativeEngine:
         )
 
     def get_narrative_template(self, id: int):
-        return self.template_service.get(id)
+        return self.narrative_template_service.get(id)
 
     def get_list_narrative_templates(self, search_term=None):
-        return self.template_service.list(search_term)
+        return self.narrative_template_service.list(search_term)
 
     def update_narrative_template(self, id: int, **kwargs):
-        return self.template_service.update(id, **kwargs)
+        return self.narrative_template_service.update(id, **kwargs)
 
     def delete_narrative_template(self, id: int):
-        return self.template_service.delete(id)
+        return self.narrative_template_service.delete(id)

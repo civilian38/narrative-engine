@@ -28,6 +28,12 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+"""
+python -m alembic -c src/narrative_engine/alembic.ini revision --autogenerate -m "migration_message"
+python -m alembic -c src/narrative_engine/alembic.ini upgrade head
+"""
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 

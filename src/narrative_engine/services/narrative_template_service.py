@@ -1,8 +1,9 @@
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from narrative_engine.domain.database import Database
 from narrative_engine.domain.models import NarrativeTemplate
-from narrative_engine.domain.schemas import (
+from narrative_engine.domain.schemas.narrative_template import (
     NarrativeTemplateCreate,
     NarrativeTemplateRetrieve,
     NarrativeTemplateUpdate,
@@ -11,7 +12,7 @@ from narrative_engine.domain.schemas import (
 from narrative_engine.exceptions import ResourceNotFoundError
 
 
-class TemplateService:
+class NarrativeTemplateService:
     def __init__(self, database: Database):
         self.database = database
 
@@ -44,7 +45,15 @@ class TemplateService:
 
     def get(self, id: int) -> NarrativeTemplateRetrieve:
         with self.database.session() as session:
-            template = session.get(NarrativeTemplate, id)
+            template = session.get(
+                NarrativeTemplate,
+                id,
+                options=[
+                    selectinload(
+                        NarrativeTemplate.character_templates
+                    )
+                ],
+            )
 
             if template is None:
                 raise ResourceNotFoundError(

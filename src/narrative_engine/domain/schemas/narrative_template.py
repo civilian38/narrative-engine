@@ -4,6 +4,7 @@ from pydantic import (
     Field,
     field_validator,
 )
+from .character_template import CharacterTemplateList
 
 class NarrativeTemplateBase(BaseModel):
     name: str = Field(max_length=100)
@@ -37,10 +38,13 @@ class NarrativeTemplateUpdate(BaseModel):
 
 
 class NarrativeTemplateRetrieve(NarrativeTemplateBase):
-    id: int
-
     model_config = ConfigDict(from_attributes=True)
 
+    id: int
+
+    character_templates: list[CharacterTemplateList] = Field(
+        default_factory=list
+    )
 
 class NarrativeTemplateList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
