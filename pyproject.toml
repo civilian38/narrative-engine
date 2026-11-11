@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.20.1",
     "sqlalchemy>=2.1.8",
 ]
 
@@ -17,3 +18,14 @@ narrative-engine = "narrative_engine:main"
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
+
+[tool.setuptools.package-data]
+narrative_engine = ["alembic.ini"]
+"narrative_engine.migrations" = [
+    "script.py.mako",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
