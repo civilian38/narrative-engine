@@ -40,3 +40,11 @@ class NarrativeTemplateRetrieve(NarrativeTemplateBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NarrativeTemplateList(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    template_description: str | None = None
