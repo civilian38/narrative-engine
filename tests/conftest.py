@@ -1,15 +1,19 @@
+
 import pytest
 
-from narrative_engine.domain.database import Database
+from narrative_engine.engine import NarrativeEngine
 
 
 @pytest.fixture
-def database(tmp_path):
-    db_path = tmp_path / "test.db"
+def engine(tmp_path):
+    db_path = tmp_path / "test_narrative.db"
 
-    db = Database(str(db_path))
-    db.migrate()
+    narrative_engine = NarrativeEngine(
+        db_path=str(db_path)
+    )
 
-    yield db
-
-    db.close()
+    try:
+        narrative_engine.initialize()
+        yield narrative_engine
+    finally:
+        narrative_engine.close()

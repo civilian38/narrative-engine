@@ -1,18 +1,11 @@
-from typing import List
-from sqlalchemy import select
-
 from narrative_engine.domain.database import Database
-from narrative_engine.domain.models import NarrativeTemplate
-from narrative_engine.domain.schemas import NarrativeTemplateCreate, NarrativeTemplateRetrieve, NarrativeTemplateUpdate, NarrativeTemplateList
-from narrative_engine.exceptions import ResourceNotFoundError
+from narrative_engine.services.template_service import TemplateService
 
 
 class NarrativeEngine:
-    def __init__(
-        self,
-        db_path: str = "narrative.db",
-    ):
+    def __init__(self, db_path: str = "narrative.db"):
         self.database = Database(db_path)
+        self.template_service = TemplateService(self.database)
 
     def initialize(self):
         self.database.migrate()
@@ -20,98 +13,28 @@ class NarrativeEngine:
     def close(self):
         self.database.close()
 
-    '''
-    Narrative Template Handling
-    '''
-
-    def create_narrative_template(self,
-                                  name: str,
-                                  world_description: str,
-                                  initial_situation: str,
-                                  template_description: str | None = None) ->NarrativeTemplateRetrieve:
-        data = NarrativeTemplateCreate(
+    def create_narrative_template(
+        self,
+        name: str,
+        world_description: str,
+        initial_situation: str,
+        template_description: str | None = None,
+    ):
+        return self.template_service.create(
             name=name,
             world_description=world_description,
             initial_situation=initial_situation,
-            template_description=template_description
+            template_description=template_description,
         )
 
-        db_template = NarrativeTemplate(
-            **data.model_dump(exclude_none=True)
-        )
+    def get_narrative_template(self, id: int):
+        return self.template_service.get(id)
 
-        with self.database.session() as session:
-            session.add(db_template)
-            session.flush()
+    def get_list_narrative_templates(self, search_term=None):
+        return self.template_service.list(search_term)
 
-            result = NarrativeTemplateRetrieve.model_validate(
-                db_template
-            )
+    def update_narrative_template(self, id: int, **kwargs):
+        return self.template_service.update(id, **kwargs)
 
-        return result
-
-    def get_list_narrative_templates(self, search_term: str | None = None) -> List[NarrativeTemplateList]:
-
-        statement = select(NarrativeTemplate)
-
-        if search_term and search_term.strip():
-            statement = statement.where(
-                NarrativeTemplate.name.contains(search_term)
-            )
-
-        with self.database.session() as session:
-            templates = session.scalars(statement).all()
-            result = [NarrativeTemplateList.model_validate(template) for template in templates]
-            return result
-
-    def get_narrative_template(self, id: int) -> NarrativeTemplateRetrieve:
-        with self.database.session() as session:
-            template = session.get(NarrativeTemplate, id)
-            if template is None:
-                raise ResourceNotFoundError(
-                    resource="NarrativeTemplate",
-                    resource_id=id,
-                )
-
-            result = NarrativeTemplateRetrieve.model_validate(template)
-            return result
-
-    def update_narrative_template(
-            self,
-            id: int,
-            **kwargs,
-    ) -> NarrativeTemplateRetrieve:
-
-        data = NarrativeTemplateUpdate(**kwargs)
-        update_data = data.model_dump(exclude_unset=True)
-
-        with self.database.session() as session:
-            template = session.get(NarrativeTemplate, id)
-
-            if template is None:
-                raise ResourceNotFoundError(
-                    resource="NarrativeTemplate",
-                    resource_id=id,
-                )
-
-            for field, value in update_data.items():
-                setattr(template, field, value)
-
-            session.flush()
-
-            result = NarrativeTemplateRetrieve.model_validate(
-                template
-            )
-
-        return result
-
-    def delete_narrative_template(self, id: int) -> None:
-        with self.database.session() as session:
-            template = session.get(NarrativeTemplate, id)
-            if template is None:
-                raise ResourceNotFoundError(
-                    resource="NarrativeTemplate",
-                    resource_id=id,
-                )
-            session.delete(template)
-            session.flush()
+    def delete_narrative_template(self, id: int):
+        return self.template_service.delete(id)
