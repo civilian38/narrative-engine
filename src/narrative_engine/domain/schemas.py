@@ -1,0 +1,42 @@
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+)
+
+class NarrativeTemplateBase(BaseModel):
+    name: str = Field(max_length=100)
+    template_description: str | None = None
+    world_description: str
+    initial_situation: str
+
+
+class NarrativeTemplateCreate(NarrativeTemplateBase):
+    pass
+
+
+class NarrativeTemplateUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    world_description: str | None = None
+    initial_situation: str | None = None
+    template_description: str | None = None
+
+    @field_validator(
+        "name",
+        "world_description",
+        "initial_situation",
+    )
+    @classmethod
+    def reject_none(cls, value):
+        if value is None:
+            raise ValueError("Field cannot be null")
+        return value
+
+
+class NarrativeTemplateRetrieve(NarrativeTemplateBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)

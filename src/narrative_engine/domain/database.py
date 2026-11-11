@@ -22,6 +22,9 @@ class Database:
     def create_session(self):
         return self.session_factory()
 
+    def session(self):
+        return self.session_factory.begin()
+
     def migrate(self):
         package_dir = Path(__file__).resolve().parents[1]
 
