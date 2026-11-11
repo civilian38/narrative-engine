@@ -1,11 +1,13 @@
 from narrative_engine.domain.database import Database
 from narrative_engine.services.narrative_template_service import NarrativeTemplateService
+from narrative_engine.services.character_template_service import CharacterTemplateService
 
 
 class NarrativeEngine:
     def __init__(self, db_path: str = "narrative.db"):
         self.database = Database(db_path)
         self.narrative_template_service = NarrativeTemplateService(self.database)
+        self.character_template_service = CharacterTemplateService(self.database)
 
     def initialize(self):
         self.database.migrate()
@@ -37,4 +39,30 @@ class NarrativeEngine:
         return self.narrative_template_service.update(id, **kwargs)
 
     def delete_narrative_template(self, id: int):
-        return self.narrative_template_service.delete(id)
+        self.narrative_template_service.delete(id)
+
+    def create_character_template(
+        self,
+        narrative_template_id: int,
+        name: str,
+        background_description: str,
+        initial_status: str
+    ):
+        return self.character_template_service.create(
+            narrative_template_id=narrative_template_id,
+            name=name,
+            background_description=background_description,
+            initial_status=initial_status,
+        )
+
+    def get_character_template(self, id: int):
+        return self.character_template_service.get(id)
+
+    def get_list_character_templates(self, search_term=None):
+        return self.character_template_service.list(search_term)
+
+    def update_character_template(self, id: int, **kwargs):
+        return self.character_template_service.update(id, **kwargs)
+
+    def delete_character_template(self, id: int):
+        self.character_template_service.delete(id)
