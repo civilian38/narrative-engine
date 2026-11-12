@@ -46,6 +46,11 @@ class NarrativeTemplate(Base):
         passive_deletes=True
     )
 
+    session_narratives: Mapped[List["SessionNarrative"]] = relationship(
+        back_populates="narrative_template",
+        passive_deletes=True,
+    )
+
 
 class CharacterTemplate(Base):
     __tablename__ = "character_template"
@@ -99,6 +104,18 @@ class SessionNarrative(Base):
     situation: Mapped[str] = mapped_column(
         Text,
         nullable=False
+    )
+
+    narrative_template_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "narrative_template.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
+
+    narrative_template: Mapped["NarrativeTemplate | None"] = relationship(
+        back_populates="session_narratives",
     )
 
     session_characters: Mapped[List["SessionCharacter"]] = relationship(

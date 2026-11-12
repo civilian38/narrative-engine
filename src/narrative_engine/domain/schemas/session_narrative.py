@@ -4,6 +4,7 @@ from pydantic import (
     Field,
     field_validator,
 )
+
 from .session_character import SessionCharacterList
 
 
@@ -14,7 +15,7 @@ class SessionNarrativeBase(BaseModel):
 
 
 class SessionNarrativeCreate(SessionNarrativeBase):
-    pass
+    narrative_template_id: int | None
 
 
 class SessionNarrativeUpdate(BaseModel):
@@ -44,14 +45,19 @@ class SessionNarrativeRetrieve(SessionNarrativeBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    narrative_template_id: int | None
 
     session_characters: list[SessionCharacterList] = Field(
         default_factory=list
     )
 
 
-class SessionNarrativeList(BaseModel):
+class SessionNarrativeListBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     title: str
+
+
+class SessionNarrativeList(SessionNarrativeListBase):
+    narrative_template_id: int | None

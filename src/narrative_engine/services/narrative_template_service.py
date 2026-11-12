@@ -49,9 +49,8 @@ class NarrativeTemplateService:
                 NarrativeTemplate,
                 id,
                 options=[
-                    selectinload(
-                        NarrativeTemplate.character_templates
-                    )
+                    selectinload(NarrativeTemplate.character_templates),
+                    selectinload(NarrativeTemplate.session_narratives)
                 ],
             )
 
