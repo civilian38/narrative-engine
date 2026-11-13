@@ -96,6 +96,7 @@ class StoryDialogueList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    story_turn_id: int
     content: str
     position: int
     kind: DialogueType

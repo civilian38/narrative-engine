@@ -1,10 +1,11 @@
 from types import TracebackType
 
-from narrative_engine.domain.models import StoryDialogue
+from narrative_engine.domain.models import StoryDialogue, DialogueType
 from narrative_engine.domain.schemas.session_character import (
     SessionCharacterRetrieve,
     SessionCharacterList,
 )
+from narrative_engine.domain.schemas.story_dialogue import StoryDialogueRetrieve, StoryDialogueList
 from narrative_engine.domain.schemas.story_turn import StoryTurnRetrieve, StoryTurnList
 from narrative_engine.services.session_character_service import SessionCharacterService
 from typing import Self
@@ -31,6 +32,9 @@ from narrative_engine.services.character_template_service import (
 from narrative_engine.services.session_narrative_service import (
     SessionNarrativeService,
 )
+from narrative_engine.services.story_dialogue_service import (
+    StoryDialogueService
+)
 from narrative_engine.services.story_turn_service import (
     StoryTurnService
 )
@@ -54,6 +58,9 @@ class NarrativeEngine:
             self.database
         )
         self.story_turn_service = StoryTurnService(
+            self.database
+        )
+        self.story_dialogue_service = StoryDialogueService(
             self.database
         )
 
@@ -280,3 +287,62 @@ class NarrativeEngine:
             resource_id: int,
     ) -> None:
         self.story_turn_service.delete(resource_id)
+
+    # Story dialogues
+
+    def create_story_dialogue(
+        self,
+        story_turn_id: int,
+        content: str,
+        position: int,
+        kind: DialogueType,
+        speaker_id: int | None = None,
+    ) -> StoryDialogueRetrieve:
+        return self.story_dialogue_service.create(
+            story_turn_id=story_turn_id,
+            content=content,
+            position=position,
+            kind=kind,
+            speaker_id=speaker_id,
+        )
+
+    def get_story_dialogue(
+        self,
+        resource_id: int,
+    ) -> StoryDialogueRetrieve:
+        return self.story_dialogue_service.get(resource_id)
+
+    def list_story_dialogues_for_turn(
+        self,
+        story_turn_id: int,
+        search_term: str | None = None,
+    ) -> list[StoryDialogueList]:
+        return self.story_dialogue_service.list_for_story_turn(
+            story_turn_id=story_turn_id,
+            search_term=search_term,
+        )
+
+    def list_story_dialogues_for_session_narrative(
+        self,
+        session_narrative_id: int,
+        search_term: str | None = None,
+    ) -> list[StoryDialogueList]:
+        return self.story_dialogue_service.list_for_session_narrative(
+            session_narrative_id=session_narrative_id,
+            search_term=search_term,
+        )
+
+    def update_story_dialogue(
+        self,
+        resource_id: int,
+        **kwargs,
+    ) -> StoryDialogueRetrieve:
+        return self.story_dialogue_service.update(
+            resource_id, **kwargs
+        )
+
+    def delete_story_dialogue(
+        self,
+        resource_id: int,
+    ) -> None:
+        self.story_dialogue_service.delete(resource_id)
