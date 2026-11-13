@@ -84,7 +84,7 @@ class CharacterTemplateService:
     ) -> CharacterTemplateRetrieve:
 
         data = CharacterTemplateUpdate(**kwargs)
-        update_data = data.model_dump(exclude_none=True)
+        update_data = data.model_dump(exclude_unset=True)
 
         with self.database.session() as session:
             template = session.get(CharacterTemplate, id)

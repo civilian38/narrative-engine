@@ -77,7 +77,7 @@ def test_list_characters(engine):
     create_sample_character(engine, narrative.id, "John")
     create_sample_character(engine, narrative.id, "Alex")
 
-    characters = engine.get_list_character_templates()
+    characters = engine.list_character_templates()
 
     assert len(characters) == 3
     assert all(
@@ -95,7 +95,7 @@ def test_list_character_fields(engine):
     narrative = create_sample_narrative(engine)
     create_sample_character(engine, narrative.id)
 
-    characters = engine.get_list_character_templates()
+    characters = engine.list_character_templates()
     character = characters[0]
 
     assert set(character.model_dump().keys()) == {
@@ -113,7 +113,7 @@ def test_search_characters(engine):
     create_sample_character(engine, narrative.id, "Sam")
     create_sample_character(engine, narrative.id, "John")
 
-    results = engine.get_list_character_templates(
+    results = engine.list_character_templates(
         search_term="Sa"
     )
 

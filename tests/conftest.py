@@ -22,3 +22,4 @@ def engine(tmp_path):
         yield narrative_engine
     finally:
         narrative_engine.close()
+

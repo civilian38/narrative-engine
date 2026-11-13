@@ -246,3 +246,4 @@ def test_negative_dialogue_position_is_rejected(engine):
                 )
             )
             session.flush()
+

@@ -3,7 +3,8 @@ from sqlalchemy.orm import selectinload
 
 from narrative_engine.domain.database import Database
 from narrative_engine.domain.models import NarrativeTemplate, SessionNarrative, SessionCharacter
-from narrative_engine.domain.schemas.session_narrative import SessionNarrativeRetrieve, SessionNarrativeList, SessionNarrativeUpdate
+from narrative_engine.domain.schemas.session_narrative import SessionNarrativeRetrieve, SessionNarrativeList, \
+    SessionNarrativeUpdate, SessionNarrativeCreate
 from narrative_engine.exceptions import ResourceNotFoundError
 
 
@@ -29,25 +30,27 @@ class SessionNarrativeService:
             )
 
             if template is None:
-                raise ValueError(
-                    f"NarrativeTemplate {narrative_template_id} not found"
+                raise ResourceNotFoundError(
+                    resource="NarrativeTemplate",
+                    resource_id=narrative_template_id,
                 )
 
-            if title is None:
-                title = template.name
-
-            session_narrative = SessionNarrative(
-                title=title,
+            data = SessionNarrativeCreate(
+                narrative_template_id=narrative_template_id,
+                title=title if title is not None else template.name,
                 world_description=template.world_description,
                 situation=template.initial_situation,
-                narrative_template_id=narrative_template_id,
+            )
+
+            session_narrative = SessionNarrative(
+                **data.model_dump(),
                 session_characters=[
                     SessionCharacter(
-                        name=character_template.name,
-                        background_description=character_template.background_description,
-                        status=character_template.initial_status,
+                        name=character.name,
+                        background_description=character.background_description,
+                        status=character.initial_status,
                     )
-                    for character_template in template.character_templates
+                    for character in template.character_templates
                 ],
             )
 
@@ -111,10 +114,16 @@ class SessionNarrativeService:
     ) -> SessionNarrativeRetrieve:
 
         data = SessionNarrativeUpdate(**kwargs)
-        update_data = data.model_dump(exclude_none=True)
+        update_data = data.model_dump(exclude_unset=True)
 
         with self.database.session() as session:
-            session_narrative = session.get(SessionNarrative, id)
+            session_narrative = session.get(
+                SessionNarrative,
+                id,
+                options=[
+                    selectinload(SessionNarrative.session_characters)
+                ]
+            )
 
             if session_narrative is None:
                 raise ResourceNotFoundError(

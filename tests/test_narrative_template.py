@@ -42,7 +42,7 @@ def test_list_templates(engine):
     create_sample_template(engine, "Medieval Fantasy")
     create_sample_template(engine, "Alien Planet")
 
-    templates = engine.get_list_narrative_templates()
+    templates = engine.list_narrative_templates()
 
     assert len(templates) == 3
 
@@ -60,7 +60,7 @@ def test_search_templates(engine):
     create_sample_template(engine, "Medieval Fantasy")
     create_sample_template(engine, "Alien Planet")
 
-    results = engine.get_list_narrative_templates(
+    results = engine.list_narrative_templates(
         search_term="Alien"
     )
 

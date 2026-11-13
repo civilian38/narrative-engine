@@ -98,7 +98,14 @@ class NarrativeTemplateService:
         update_data = data.model_dump(exclude_unset=True)
 
         with self.database.session() as session:
-            template = session.get(NarrativeTemplate, id)
+            template = session.get(
+                NarrativeTemplate,
+                id,
+                options=[
+                    selectinload(NarrativeTemplate.character_templates),
+                    selectinload(NarrativeTemplate.session_narratives)
+                ],
+            )
 
             if template is None:
                 raise ResourceNotFoundError(

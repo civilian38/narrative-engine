@@ -41,7 +41,7 @@ def create_sample_character(engine, narrative_template_id, name="Sarah"):
 def test_create_session_narrative(engine):
     template = create_sample_template(engine)
 
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
 
     assert isinstance(created, SessionNarrativeRetrieve)
     assert isinstance(created.id, int)
@@ -57,7 +57,7 @@ def test_create_session_narrative(engine):
 def test_create_session_narrative_with_custom_title(engine):
     template = create_sample_template(engine)
 
-    created = engine.create_session_narrative_template(
+    created = engine.create_session_narrative(
         narrative_template_id=template.id,
         title="첫 번째 생존 기록",
     )
@@ -73,7 +73,7 @@ def test_create_session_narrative_copies_characters(engine):
     sarah = create_sample_character(engine, template.id, "Sarah")
     john = create_sample_character(engine, template.id, "John")
 
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
     characters = {character.name: character for character in created.session_characters}
 
     assert len(characters) == 2
@@ -98,7 +98,7 @@ def test_create_session_narrative_copies_characters(engine):
 def test_session_narrative_is_independent_snapshot(engine):
     template = create_sample_template(engine)
     character = create_sample_character(engine, template.id)
-    first = engine.create_session_narrative_template(template.id)
+    first = engine.create_session_narrative(template.id)
 
     engine.update_narrative_template(
         template.id,
@@ -111,7 +111,7 @@ def test_session_narrative_is_independent_snapshot(engine):
         initial_status="안전한 기지에서 대기 중",
     )
 
-    second = engine.create_session_narrative_template(template.id)
+    second = engine.create_session_narrative(template.id)
     first_after_update = engine.get_session_narrative(first.id)
 
     assert first_after_update.world_description == "외계인이 침략한 지구"
@@ -132,10 +132,15 @@ def test_session_narrative_is_independent_snapshot(engine):
         assert second_character.status == "안전한 기지에서 대기 중"
 
 
-# CREATE: 존재하지 않는 템플릿은 현재 서비스 구현대로 ValueError를 발생시킨다.
+# CREATE: 존재하지 않는 템플릿은 ResourceNotFoundError를 발생시킨다.
 def test_create_session_narrative_with_missing_template(engine):
-    with pytest.raises(ValueError, match="NarrativeTemplate 999999 not found"):
-        engine.create_session_narrative_template(999999)
+    nonexistent_id = 999999
+
+    with pytest.raises(ResourceNotFoundError) as exc_info:
+        engine.create_session_narrative(nonexistent_id)
+
+    assert exc_info.value.resource == "NarrativeTemplate"
+    assert exc_info.value.resource_id == nonexistent_id
 
 
 # CREATE SCHEMA: 선언된 제목 길이 제약을 검증한다.
@@ -154,7 +159,7 @@ def test_session_narrative_create_schema_invalid_title(invalid_title):
 def test_get_session_narrative(engine):
     template = create_sample_template(engine)
     create_sample_character(engine, template.id)
-    created = engine.create_session_narrative_template(template.id, title="Session 1")
+    created = engine.create_session_narrative(template.id, title="Session 1")
 
     retrieved = engine.get_session_narrative(created.id)
 
@@ -171,11 +176,11 @@ def test_get_session_narrative(engine):
 # LIST: 생성 순서대로 조회되며 각 항목은 목록용 스키마를 따른다.
 def test_list_session_narratives(engine):
     template = create_sample_template(engine)
-    first = engine.create_session_narrative_template(template.id, title="Session A")
-    second = engine.create_session_narrative_template(template.id, title="Session B")
-    third = engine.create_session_narrative_template(template.id, title="Session C")
+    first = engine.create_session_narrative(template.id, title="Session A")
+    second = engine.create_session_narrative(template.id, title="Session B")
+    third = engine.create_session_narrative(template.id, title="Session C")
 
-    sessions = engine.get_list_session_narratives()
+    sessions = engine.list_session_narratives()
 
     assert all(isinstance(item, SessionNarrativeList) for item in sessions)
     assert [item.id for item in sessions] == [first.id, second.id, third.id]
@@ -186,9 +191,9 @@ def test_list_session_narratives(engine):
 # LIST SCHEMA
 def test_list_session_narrative_fields(engine):
     template = create_sample_template(engine)
-    engine.create_session_narrative_template(template.id)
+    engine.create_session_narrative(template.id)
 
-    session_narrative = engine.get_list_session_narratives()[0]
+    session_narrative = engine.list_session_narratives()[0]
 
     assert set(session_narrative.model_dump()) == {
         "id", "title", "narrative_template_id"
@@ -199,9 +204,9 @@ def test_list_session_narrative_fields(engine):
 def test_search_session_narratives(engine):
     template = create_sample_template(engine)
     for title in ["Alien Rescue", "Alien Invasion", "Medieval Quest"]:
-        engine.create_session_narrative_template(template.id, title=title)
+        engine.create_session_narrative(template.id, title=title)
 
-    results = engine.get_list_session_narratives(search_term="  Alien  ")
+    results = engine.list_session_narratives(search_term="  Alien  ")
 
     assert {item.title for item in results} == {"Alien Rescue", "Alien Invasion"}
 
@@ -210,16 +215,16 @@ def test_search_session_narratives(engine):
 @pytest.mark.parametrize("search_term", [None, "", "   "])
 def test_search_session_narratives_with_empty_term(engine, search_term):
     template = create_sample_template(engine)
-    engine.create_session_narrative_template(template.id, title="Session A")
-    engine.create_session_narrative_template(template.id, title="Session B")
+    engine.create_session_narrative(template.id, title="Session A")
+    engine.create_session_narrative(template.id, title="Session B")
 
-    assert len(engine.get_list_session_narratives(search_term)) == 2
+    assert len(engine.list_session_narratives(search_term)) == 2
 
 
 # UPDATE: 일부 필드만 수정하고 실제 DB에 저장되는지 검증한다.
 def test_update_session_narrative(engine):
     template = create_sample_template(engine)
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
 
     updated = engine.update_session_narrative(
         created.id,
@@ -241,7 +246,7 @@ def test_update_session_narrative(engine):
 # UPDATE: world_description 단독 수정도 허용된다.
 def test_update_session_narrative_world_description(engine):
     template = create_sample_template(engine)
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
 
     updated = engine.update_session_narrative(
         created.id, world_description="황폐해진 우주 정거장"
@@ -269,7 +274,7 @@ def test_update_session_narrative_world_description(engine):
 )
 def test_update_session_narrative_invalid_data(engine, update_data):
     template = create_sample_template(engine)
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
 
     with pytest.raises(ValidationError):
         engine.update_session_narrative(created.id, **update_data)
@@ -281,7 +286,7 @@ def test_update_session_narrative_invalid_data(engine, update_data):
 # UPDATE: 수정할 필드가 없으면 값이 그대로 유지된다.
 def test_update_session_narrative_without_changes(engine):
     template = create_sample_template(engine)
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
 
     updated = engine.update_session_narrative(created.id)
 
@@ -291,13 +296,13 @@ def test_update_session_narrative_without_changes(engine):
 # DELETE
 def test_delete_session_narrative(engine):
     template = create_sample_template(engine)
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
 
     engine.delete_session_narrative(created.id)
 
     with pytest.raises(ResourceNotFoundError):
         engine.get_session_narrative(created.id)
-    assert engine.get_list_session_narratives() == []
+    assert engine.list_session_narratives() == []
 
 
 # NOT FOUND
@@ -320,8 +325,8 @@ def test_session_narrative_not_found(engine, operation):
 # RELATIONSHIP: 원본 템플릿에서 관련 세션 목록을 조회할 수 있다.
 def test_narrative_template_contains_session_narratives(engine):
     template = create_sample_template(engine)
-    first = engine.create_session_narrative_template(template.id, title="First")
-    second = engine.create_session_narrative_template(template.id, title="Second")
+    first = engine.create_session_narrative(template.id, title="First")
+    second = engine.create_session_narrative(template.id, title="Second")
 
     retrieved = engine.get_narrative_template(template.id)
 
@@ -337,7 +342,7 @@ def test_narrative_template_contains_session_narratives(engine):
 def test_delete_template_keeps_session_narrative(engine):
     template = create_sample_template(engine)
     create_sample_character(engine, template.id)
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
     session_character_id = created.session_characters[0].id
 
     engine.delete_narrative_template(template.id)
@@ -350,7 +355,7 @@ def test_delete_template_keeps_session_narrative(engine):
     assert [item.id for item in retrieved.session_characters] == [
         session_character_id
     ]
-    assert engine.get_list_session_narratives()[0].narrative_template_id is None
+    assert engine.list_session_narratives()[0].narrative_template_id is None
 
     with engine.database.session() as session:
         assert session.get(SessionCharacter, session_character_id) is not None
@@ -361,7 +366,7 @@ def test_delete_session_narrative_deletes_session_characters(engine):
     template = create_sample_template(engine)
     create_sample_character(engine, template.id, "Sarah")
     create_sample_character(engine, template.id, "John")
-    created = engine.create_session_narrative_template(template.id)
+    created = engine.create_session_narrative(template.id)
     character_ids = [item.id for item in created.session_characters]
 
     engine.delete_session_narrative(created.id)
@@ -385,7 +390,7 @@ def test_session_narrative_persistence(tmp_path):
         first_engine.initialize()
         template = create_sample_template(first_engine)
         create_sample_character(first_engine, template.id)
-        created = first_engine.create_session_narrative_template(
+        created = first_engine.create_session_narrative(
             template.id, title="Saved Session"
         )
         session_narrative_id = created.id
@@ -408,3 +413,4 @@ def test_session_narrative_persistence(tmp_path):
         ]
     finally:
         second_engine.close()
+
