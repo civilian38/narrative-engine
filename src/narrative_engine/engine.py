@@ -1,8 +1,11 @@
 from types import TracebackType
+
+from narrative_engine.domain.models import StoryDialogue
 from narrative_engine.domain.schemas.session_character import (
     SessionCharacterRetrieve,
     SessionCharacterList,
 )
+from narrative_engine.domain.schemas.story_turn import StoryTurnRetrieve, StoryTurnList
 from narrative_engine.services.session_character_service import SessionCharacterService
 from typing import Self
 
@@ -28,6 +31,9 @@ from narrative_engine.services.character_template_service import (
 from narrative_engine.services.session_narrative_service import (
     SessionNarrativeService,
 )
+from narrative_engine.services.story_turn_service import (
+    StoryTurnService
+)
 
 
 class NarrativeEngine:
@@ -45,6 +51,9 @@ class NarrativeEngine:
             self.database
         )
         self.session_narrative_service = SessionNarrativeService(
+            self.database
+        )
+        self.story_turn_service = StoryTurnService(
             self.database
         )
 
@@ -226,3 +235,48 @@ class NarrativeEngine:
 
     def delete_session_character(self, resource_id: int) -> None:
         self.session_character_service.delete(resource_id)
+
+    # Story turns
+
+    def create_story_turn(
+            self,
+            session_narrative_id: int,
+            user_input: str,
+            story_dialogues: list[StoryDialogue],
+    ) -> StoryTurnRetrieve:
+        return self.story_turn_service.create(
+            session_narrative_id=session_narrative_id,
+            user_input=user_input,
+            story_dialogues=story_dialogues,
+        )
+
+    def get_story_turn(
+            self,
+            resource_id: int,
+    ) -> StoryTurnRetrieve:
+        return self.story_turn_service.get(resource_id)
+
+    def list_story_turns(
+            self,
+            search_term: str | None = None,
+            session_narrative_id: int | None = None,
+    ) -> list[StoryTurnList]:
+        return self.story_turn_service.list(
+            search_term=search_term,
+            session_narrative_id=session_narrative_id,
+        )
+
+    def update_story_turn(
+            self,
+            resource_id: int,
+            **kwargs,
+    ) -> StoryTurnRetrieve:
+        return self.story_turn_service.update(
+            resource_id, **kwargs
+        )
+
+    def delete_story_turn(
+            self,
+            resource_id: int,
+    ) -> None:
+        self.story_turn_service.delete(resource_id)
