@@ -1,4 +1,9 @@
 from types import TracebackType
+from narrative_engine.domain.schemas.session_character import (
+    SessionCharacterRetrieve,
+    SessionCharacterList,
+)
+from narrative_engine.services.session_character_service import SessionCharacterService
 from typing import Self
 
 from narrative_engine.domain.database import Database
@@ -30,7 +35,9 @@ class NarrativeEngine:
 
     def __init__(self, db_path: str = "narrative.db") -> None:
         self.database = Database(db_path)
-
+        self.session_character_service = SessionCharacterService(
+            self.database
+        )
         self.narrative_template_service = NarrativeTemplateService(
             self.database
         )
@@ -182,3 +189,40 @@ class NarrativeEngine:
         resource_id: int,
     ) -> None:
         self.session_narrative_service.delete(resource_id)
+
+    # Session characters
+
+    def create_session_character(
+        self,
+        session_narrative_id: int,
+        name: str,
+        background_description: str,
+        status: str,
+    ) -> SessionCharacterRetrieve:
+        return self.session_character_service.create(
+            session_narrative_id=session_narrative_id,
+            name=name,
+            background_description=background_description,
+            status=status,
+        )
+
+    def get_session_character(self, resource_id: int) -> SessionCharacterRetrieve:
+        return self.session_character_service.get(resource_id)
+
+    def list_session_characters(
+        self,
+        search_term: str | None = None,
+        session_narrative_id: int | None = None,
+    ) -> list[SessionCharacterList]:
+        return self.session_character_service.list(
+            search_term=search_term,
+            session_narrative_id=session_narrative_id,
+        )
+
+    def update_session_character(
+        self, resource_id: int, **kwargs,
+    ) -> SessionCharacterRetrieve:
+        return self.session_character_service.update(resource_id, **kwargs)
+
+    def delete_session_character(self, resource_id: int) -> None:
+        self.session_character_service.delete(resource_id)

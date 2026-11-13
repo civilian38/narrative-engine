@@ -65,3 +65,4 @@ class SessionCharacterList(BaseModel):
     id: int
     name: str
     background_description: str
+    status: str
