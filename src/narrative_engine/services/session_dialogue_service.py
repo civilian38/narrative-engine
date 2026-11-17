@@ -6,14 +6,14 @@ from narrative_engine.domain.database import Database
 from narrative_engine.domain.models import (
     DialogueType,
     SessionCharacter,
-    StoryDialogue,
-    StoryTurn,
+    SessionDialogue,
+    SessionTurn,
 )
-from narrative_engine.domain.schemas.story_dialogue import (
-    StoryDialogueCreate,
-    StoryDialogueRetrieve,
-    StoryDialogueList,
-    StoryDialogueUpdate,
+from narrative_engine.domain.schemas.session_dialogue import (
+    SessionDialogueCreate,
+    SessionDialogueRetrieve,
+    SessionDialogueList,
+    SessionDialogueUpdate,
 )
 from narrative_engine.exceptions import (
     ResourceNotFoundError,
@@ -21,14 +21,14 @@ from narrative_engine.exceptions import (
 )
 
 
-class StoryDialogueService:
+class SessionDialogueService:
     def __init__(self, database: Database):
         self.database = database
 
     @staticmethod
     def _validate_speaker(
         session: Session,
-        story_turn: StoryTurn,
+        session_turn: SessionTurn,
         speaker_id: int | None,
     ) -> None:
         if speaker_id is None:
@@ -44,24 +44,24 @@ class StoryDialogueService:
 
         if (
             speaker.session_narrative_id
-            != story_turn.session_narrative_id
+            != session_turn.session_narrative_id
         ):
             raise InvalidOperationError(
                 "Dialogue speaker must belong to the same "
-                "SessionNarrative as its StoryTurn"
+                "SessionNarrative as its SessionTurn"
             )
 
     def create(
         self,
-        story_turn_id: int,
+        session_turn_id: int,
         content: str,
         position: int,
         kind: DialogueType,
         speaker_id: int | None = None,
-    ) -> StoryDialogueRetrieve:
+    ) -> SessionDialogueRetrieve:
 
-        data = StoryDialogueCreate(
-            story_turn_id=story_turn_id,
+        data = SessionDialogueCreate(
+            session_turn_id=session_turn_id,
             content=content,
             position=position,
             kind=kind,
@@ -69,72 +69,72 @@ class StoryDialogueService:
         )
 
         with self.database.session() as session:
-            story_turn = session.get(StoryTurn, story_turn_id)
+            session_turn = session.get(SessionTurn, session_turn_id)
 
-            if story_turn is None:
+            if session_turn is None:
                 raise ResourceNotFoundError(
-                    resource="StoryTurn",
-                    resource_id=story_turn_id,
+                    resource="SessionTurn",
+                    resource_id=session_turn_id,
                 )
 
             self._validate_speaker(
                 session,
-                story_turn,
+                session_turn,
                 data.speaker_id,
             )
 
-            dialogue = StoryDialogue(**data.model_dump())
+            dialogue = SessionDialogue(**data.model_dump())
 
             session.add(dialogue)
             session.flush()
 
-            result = StoryDialogueRetrieve.model_validate(
+            result = SessionDialogueRetrieve.model_validate(
                 dialogue
             )
 
         return result
 
-    def get(self, id: int) -> StoryDialogueRetrieve:
+    def get(self, id: int) -> SessionDialogueRetrieve:
         with self.database.session() as session:
-            dialogue = session.get(StoryDialogue, id)
+            dialogue = session.get(SessionDialogue, id)
 
             if dialogue is None:
                 raise ResourceNotFoundError(
-                    resource="StoryDialogue",
+                    resource="SessionDialogue",
                     resource_id=id,
                 )
 
-            return StoryDialogueRetrieve.model_validate(
+            return SessionDialogueRetrieve.model_validate(
                 dialogue
             )
 
-    def list_for_story_turn(
+    def list_for_session_turn(
         self,
-        story_turn_id: int,
+        session_turn_id: int,
         search_term: str | None = None,
-    ) -> list[StoryDialogueList]:
+    ) -> list[SessionDialogueList]:
 
-        statement = select(StoryDialogue).where(
-            StoryDialogue.story_turn_id == story_turn_id
+        statement = select(SessionDialogue).where(
+            SessionDialogue.session_turn_id == session_turn_id
         )
 
         if search_term and search_term.strip():
             statement = statement.where(
-                StoryDialogue.content.contains(
+                SessionDialogue.content.contains(
                     search_term.strip()
                 )
             )
 
         statement = statement.order_by(
-            StoryDialogue.position,
-            StoryDialogue.id,
+            SessionDialogue.position,
+            SessionDialogue.id,
         )
 
         with self.database.session() as session:
             dialogues = session.scalars(statement).all()
 
             return [
-                StoryDialogueList.model_validate(dialogue)
+                SessionDialogueList.model_validate(dialogue)
                 for dialogue in dialogues
             ]
 
@@ -142,38 +142,38 @@ class StoryDialogueService:
         self,
         session_narrative_id: int,
         search_term: str | None = None,
-    ) -> list[StoryDialogueList]:
+    ) -> list[SessionDialogueList]:
 
         statement = (
-            select(StoryDialogue)
+            select(SessionDialogue)
             .join(
-                StoryTurn,
-                StoryDialogue.story_turn_id == StoryTurn.id,
+                SessionTurn,
+                SessionDialogue.session_turn_id == SessionTurn.id,
             )
             .where(
-                StoryTurn.session_narrative_id
+                SessionTurn.session_narrative_id
                 == session_narrative_id
             )
         )
 
         if search_term and search_term.strip():
             statement = statement.where(
-                StoryDialogue.content.contains(
+                SessionDialogue.content.contains(
                     search_term.strip()
                 )
             )
 
         statement = statement.order_by(
-            StoryTurn.turn_index,
-            StoryDialogue.position,
-            StoryDialogue.id,
+            SessionTurn.turn_index,
+            SessionDialogue.position,
+            SessionDialogue.id,
         )
 
         with self.database.session() as session:
             dialogues = session.scalars(statement).all()
 
             return [
-                StoryDialogueList.model_validate(dialogue)
+                SessionDialogueList.model_validate(dialogue)
                 for dialogue in dialogues
             ]
 
@@ -181,24 +181,24 @@ class StoryDialogueService:
         self,
         id: int,
         **kwargs,
-    ) -> StoryDialogueRetrieve:
+    ) -> SessionDialogueRetrieve:
 
-        data = StoryDialogueUpdate(**kwargs)
+        data = SessionDialogueUpdate(**kwargs)
         update_data = data.model_dump(exclude_unset=True)
 
         with self.database.session() as session:
-            dialogue = session.get(StoryDialogue, id)
+            dialogue = session.get(SessionDialogue, id)
 
             if dialogue is None:
                 raise ResourceNotFoundError(
-                    resource="StoryDialogue",
+                    resource="SessionDialogue",
                     resource_id=id,
                 )
 
             # Validate the complete resulting state, not just
             # the fields supplied in this partial update.
-            validated = StoryDialogueCreate(
-                story_turn_id=dialogue.story_turn_id,
+            validated = SessionDialogueCreate(
+                session_turn_id=dialogue.session_turn_id,
                 content=update_data.get(
                     "content", dialogue.content
                 ),
@@ -213,20 +213,20 @@ class StoryDialogueService:
                 ),
             )
 
-            story_turn = session.get(
-                StoryTurn,
-                dialogue.story_turn_id,
+            session_turn = session.get(
+                SessionTurn,
+                dialogue.session_turn_id,
             )
 
-            if story_turn is None:
+            if session_turn is None:
                 raise ResourceNotFoundError(
-                    resource="StoryTurn",
-                    resource_id=dialogue.story_turn_id,
+                    resource="SessionTurn",
+                    resource_id=dialogue.session_turn_id,
                 )
 
             self._validate_speaker(
                 session,
-                story_turn,
+                session_turn,
                 validated.speaker_id,
             )
 
@@ -235,17 +235,17 @@ class StoryDialogueService:
 
             session.flush()
 
-            return StoryDialogueRetrieve.model_validate(
+            return SessionDialogueRetrieve.model_validate(
                 dialogue
             )
 
     def delete(self, id: int) -> None:
         with self.database.session() as session:
-            dialogue = session.get(StoryDialogue, id)
+            dialogue = session.get(SessionDialogue, id)
 
             if dialogue is None:
                 raise ResourceNotFoundError(
-                    resource="StoryDialogue",
+                    resource="SessionDialogue",
                     resource_id=id,
                 )
 

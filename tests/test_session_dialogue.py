@@ -1,10 +1,10 @@
 
-"""StoryDialogue integration tests.
+"""SessionDialogue integration tests.
 
 Uses the engine fixture from tests/conftest.py.
 
 Run:
-    uv run python -m pytest tests/test_story_dialogue.py -v
+    uv run python -m pytest tests/test_session_dialogue.py -v
 """
 
 import pytest
@@ -14,12 +14,12 @@ from sqlalchemy.exc import IntegrityError
 from narrative_engine.engine import NarrativeEngine
 from narrative_engine.domain.models import (
     DialogueType,
-    StoryDialogue,
+    SessionDialogue,
 )
-from narrative_engine.domain.schemas.story_dialogue import (
-    StoryDialogueCreate,
-    StoryDialogueRetrieve,
-    StoryDialogueList,
+from narrative_engine.domain.schemas.session_dialogue import (
+    SessionDialogueCreate,
+    SessionDialogueRetrieve,
+    SessionDialogueList,
 )
 from narrative_engine.exceptions import (
     ResourceNotFoundError,
@@ -30,7 +30,7 @@ from narrative_engine.exceptions import (
 # Test data helpers
 
 def create_sample_session(engine):
-    template = engine.create_narrative_template(
+    template = engine.create_template_narrative(
         name="Alien Invasion",
         world_description="외계인이 침략한 지구",
         initial_situation="Sarah는 폐허에서 깨어났다.",
@@ -39,10 +39,10 @@ def create_sample_session(engine):
 
 
 def create_sample_turn(engine, session_narrative_id):
-    return engine.create_story_turn(
+    return engine.create_session_turn(
         session_narrative_id=session_narrative_id,
         user_input="주변을 살펴본다.",
-        story_dialogues=[],
+        session_dialogues=[],
     )
 
 
@@ -61,14 +61,14 @@ def create_sample_character(
 
 def create_sample_dialogue(
     engine,
-    story_turn_id,
+    session_turn_id,
     content="문이 천천히 열렸다.",
     position=0,
     kind=DialogueType.Narration,
     speaker_id=None,
 ):
-    return engine.create_story_dialogue(
-        story_turn_id=story_turn_id,
+    return engine.create_session_dialogue(
+        session_turn_id=session_turn_id,
         content=content,
         position=position,
         kind=kind,
@@ -78,37 +78,37 @@ def create_sample_dialogue(
 
 # CREATE
 
-def test_create_story_dialogue_narration(engine):
+def test_create_session_dialogue_narration(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
     )
 
-    assert isinstance(created, StoryDialogueRetrieve)
+    assert isinstance(created, SessionDialogueRetrieve)
     assert isinstance(created.id, int)
     assert created.id > 0
-    assert created.story_turn_id == turn.id
+    assert created.session_turn_id == turn.id
     assert created.content == "문이 천천히 열렸다."
     assert created.position == 0
     assert created.kind == DialogueType.Narration
     assert created.speaker_id is None
 
-    retrieved_turn = engine.get_story_turn(turn.id)
-    assert len(retrieved_turn.story_dialogues) == 1
-    assert retrieved_turn.story_dialogues[0].id == created.id
+    retrieved_turn = engine.get_session_turn(turn.id)
+    assert len(retrieved_turn.session_dialogues) == 1
+    assert retrieved_turn.session_dialogues[0].id == created.id
 
 
-def test_create_story_dialogue_with_speaker(engine):
+def test_create_session_dialogue_with_speaker(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
     character = create_sample_character(engine, narrative.id)
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         content="여기가 어디지?",
         kind=DialogueType.Dialogue,
         speaker_id=character.id,
@@ -117,36 +117,36 @@ def test_create_story_dialogue_with_speaker(engine):
     assert created.kind == DialogueType.Dialogue
     assert created.content == "여기가 어디지?"
     assert created.speaker_id == character.id
-    assert created.story_turn_id == turn.id
+    assert created.session_turn_id == turn.id
 
     with engine.database.session() as session:
-        saved = session.get(StoryDialogue, created.id)
+        saved = session.get(SessionDialogue, created.id)
 
         assert saved is not None
         assert saved.speaker_id == character.id
 
 
-def test_create_story_dialogue_with_missing_turn(engine):
+def test_create_session_dialogue_with_missing_turn(engine):
     nonexistent_id = 999999
 
     with pytest.raises(ResourceNotFoundError) as exc_info:
         create_sample_dialogue(
             engine,
-            story_turn_id=nonexistent_id,
+            session_turn_id=nonexistent_id,
         )
 
-    assert exc_info.value.resource == "StoryTurn"
+    assert exc_info.value.resource == "SessionTurn"
     assert exc_info.value.resource_id == nonexistent_id
 
 
-def test_create_story_dialogue_with_missing_speaker(engine):
+def test_create_session_dialogue_with_missing_speaker(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     with pytest.raises(ResourceNotFoundError) as exc_info:
         create_sample_dialogue(
             engine,
-            story_turn_id=turn.id,
+            session_turn_id=turn.id,
             kind=DialogueType.Dialogue,
             speaker_id=999999,
         )
@@ -154,10 +154,10 @@ def test_create_story_dialogue_with_missing_speaker(engine):
     assert exc_info.value.resource == "SessionCharacter"
     assert exc_info.value.resource_id == 999999
 
-    assert engine.list_story_dialogues_for_turn(turn.id) == []
+    assert engine.list_session_dialogues_for_turn(turn.id) == []
 
 
-def test_create_story_dialogue_with_other_session_speaker(engine):
+def test_create_session_dialogue_with_other_session_speaker(engine):
     first_session = create_sample_session(engine)
     second_session = create_sample_session(engine)
 
@@ -170,12 +170,12 @@ def test_create_story_dialogue_with_other_session_speaker(engine):
     with pytest.raises(InvalidOperationError):
         create_sample_dialogue(
             engine,
-            story_turn_id=turn.id,
+            session_turn_id=turn.id,
             kind=DialogueType.Dialogue,
             speaker_id=character.id,
         )
 
-    assert engine.list_story_dialogues_for_turn(turn.id) == []
+    assert engine.list_session_dialogues_for_turn(turn.id) == []
 
 
 @pytest.mark.parametrize(
@@ -185,7 +185,7 @@ def test_create_story_dialogue_with_other_session_speaker(engine):
         (DialogueType.Narration, 1),
     ],
 )
-def test_create_story_dialogue_invalid_speaker(
+def test_create_session_dialogue_invalid_speaker(
     engine,
     kind,
     speaker_id,
@@ -196,12 +196,12 @@ def test_create_story_dialogue_invalid_speaker(
     with pytest.raises(InvalidOperationError):
         create_sample_dialogue(
             engine,
-            story_turn_id=turn.id,
+            session_turn_id=turn.id,
             kind=kind,
             speaker_id=speaker_id,
         )
 
-    assert engine.list_story_dialogues_for_turn(turn.id) == []
+    assert engine.list_session_dialogues_for_turn(turn.id) == []
 
 
 @pytest.mark.parametrize(
@@ -214,12 +214,12 @@ def test_create_story_dialogue_invalid_speaker(
         {"kind": "InvalidType"},
     ],
 )
-def test_create_story_dialogue_invalid_data(engine, changes):
+def test_create_session_dialogue_invalid_data(engine, changes):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     data = {
-        "story_turn_id": turn.id,
+        "session_turn_id": turn.id,
         "content": "테스트 내레이션",
         "position": 0,
         "kind": DialogueType.Narration,
@@ -227,28 +227,28 @@ def test_create_story_dialogue_invalid_data(engine, changes):
     data.update(changes)
 
     with pytest.raises(ValidationError):
-        engine.create_story_dialogue(**data)
+        engine.create_session_dialogue(**data)
 
-    assert engine.list_story_dialogues_for_turn(turn.id) == []
+    assert engine.list_session_dialogues_for_turn(turn.id) == []
 
 
-def test_story_dialogue_create_schema_invalid_position():
+def test_session_dialogue_create_schema_invalid_position():
     with pytest.raises(ValidationError):
-        StoryDialogueCreate(
-            story_turn_id=1,
+        SessionDialogueCreate(
+            session_turn_id=1,
             content="잘못된 위치",
             position=-1,
             kind=DialogueType.Narration,
         )
 
 
-def test_create_story_dialogue_duplicate_position(engine):
+def test_create_session_dialogue_duplicate_position(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     first = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         content="첫 번째 문장",
         position=0,
     )
@@ -256,12 +256,12 @@ def test_create_story_dialogue_duplicate_position(engine):
     with pytest.raises(IntegrityError):
         create_sample_dialogue(
             engine,
-            story_turn_id=turn.id,
+            session_turn_id=turn.id,
             content="중복된 위치",
             position=0,
         )
 
-    results = engine.list_story_dialogues_for_turn(turn.id)
+    results = engine.list_session_dialogues_for_turn(turn.id)
 
     assert len(results) == 1
     assert results[0].id == first.id
@@ -269,24 +269,24 @@ def test_create_story_dialogue_duplicate_position(engine):
 
 # READ
 
-def test_get_story_dialogue(engine):
+def test_get_session_dialogue(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
     )
 
-    retrieved = engine.get_story_dialogue(created.id)
+    retrieved = engine.get_session_dialogue(created.id)
 
-    assert isinstance(retrieved, StoryDialogueRetrieve)
+    assert isinstance(retrieved, SessionDialogueRetrieve)
     assert retrieved.model_dump() == created.model_dump()
 
 
 # LIST FOR STORY TURN
 
-def test_list_story_dialogues_for_turn(engine):
+def test_list_session_dialogues_for_turn(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
@@ -300,11 +300,11 @@ def test_list_story_dialogues_for_turn(engine):
         engine, turn.id, "두 번째 문장", position=1
     )
 
-    results = engine.list_story_dialogues_for_turn(turn.id)
+    results = engine.list_session_dialogues_for_turn(turn.id)
 
     assert len(results) == 3
     assert all(
-        isinstance(item, StoryDialogueList)
+        isinstance(item, SessionDialogueList)
         for item in results
     )
 
@@ -316,17 +316,17 @@ def test_list_story_dialogues_for_turn(engine):
     assert [item.position for item in results] == [0, 1, 2]
 
 
-def test_list_story_dialogue_fields(engine):
+def test_list_session_dialogue_fields(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     create_sample_dialogue(engine, turn.id)
 
-    dialogue = engine.list_story_dialogues_for_turn(turn.id)[0]
+    dialogue = engine.list_session_dialogues_for_turn(turn.id)[0]
 
     assert set(dialogue.model_dump()) == {
         "id",
-        "story_turn_id",
+        "session_turn_id",
         "content",
         "position",
         "kind",
@@ -334,7 +334,7 @@ def test_list_story_dialogue_fields(engine):
     }
 
 
-def test_list_story_dialogues_for_turn_isolated(engine):
+def test_list_session_dialogues_for_turn_isolated(engine):
     narrative = create_sample_session(engine)
 
     first_turn = create_sample_turn(engine, narrative.id)
@@ -347,7 +347,7 @@ def test_list_story_dialogues_for_turn_isolated(engine):
         engine, second_turn.id, "두 번째 턴", position=0
     )
 
-    results = engine.list_story_dialogues_for_turn(
+    results = engine.list_session_dialogues_for_turn(
         first_turn.id
     )
 
@@ -356,7 +356,7 @@ def test_list_story_dialogues_for_turn_isolated(engine):
 
 # LIST FOR SESSION NARRATIVE
 
-def test_list_story_dialogues_for_session_narrative(engine):
+def test_list_session_dialogues_for_session_narrative(engine):
     narrative = create_sample_session(engine)
 
     first_turn = create_sample_turn(engine, narrative.id)
@@ -373,14 +373,14 @@ def test_list_story_dialogues_for_session_narrative(engine):
     )
 
     results = (
-        engine.list_story_dialogues_for_session_narrative(
+        engine.list_session_dialogues_for_session_narrative(
             narrative.id
         )
     )
 
     assert len(results) == 3
     assert all(
-        isinstance(item, StoryDialogueList)
+        isinstance(item, SessionDialogueList)
         for item in results
     )
 
@@ -390,14 +390,14 @@ def test_list_story_dialogues_for_session_narrative(engine):
         third_line.id,
     ]
 
-    assert [item.story_turn_id for item in results] == [
+    assert [item.session_turn_id for item in results] == [
         first_turn.id,
         first_turn.id,
         second_turn.id,
     ]
 
 
-def test_list_story_dialogues_for_session_isolated(engine):
+def test_list_session_dialogues_for_session_isolated(engine):
     first_session = create_sample_session(engine)
     second_session = create_sample_session(engine)
 
@@ -412,7 +412,7 @@ def test_list_story_dialogues_for_session_isolated(engine):
     )
 
     results = (
-        engine.list_story_dialogues_for_session_narrative(
+        engine.list_session_dialogues_for_session_narrative(
             first_session.id
         )
     )
@@ -420,20 +420,20 @@ def test_list_story_dialogues_for_session_isolated(engine):
     assert [item.id for item in results] == [first.id]
 
 
-def test_list_story_dialogues_empty_results(engine):
+def test_list_session_dialogues_empty_results(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
-    assert engine.list_story_dialogues_for_turn(turn.id) == []
+    assert engine.list_session_dialogues_for_turn(turn.id) == []
     assert (
-        engine.list_story_dialogues_for_session_narrative(
+        engine.list_session_dialogues_for_session_narrative(
             narrative.id
         ) == []
     )
 
-    assert engine.list_story_dialogues_for_turn(999999) == []
+    assert engine.list_session_dialogues_for_turn(999999) == []
     assert (
-        engine.list_story_dialogues_for_session_narrative(
+        engine.list_session_dialogues_for_session_narrative(
             999999
         ) == []
     )
@@ -445,7 +445,7 @@ def test_list_story_dialogues_empty_results(engine):
     "list_mode",
     ["turn", "session"],
 )
-def test_search_story_dialogues(engine, list_mode):
+def test_search_session_dialogues(engine, list_mode):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
@@ -460,13 +460,13 @@ def test_search_story_dialogues(engine, list_mode):
     )
 
     if list_mode == "turn":
-        results = engine.list_story_dialogues_for_turn(
+        results = engine.list_session_dialogues_for_turn(
             turn.id,
             search_term="  문이  ",
         )
     else:
         results = (
-            engine.list_story_dialogues_for_session_narrative(
+            engine.list_session_dialogues_for_session_narrative(
                 narrative.id,
                 search_term="  문이  ",
             )
@@ -480,7 +480,7 @@ def test_search_story_dialogues(engine, list_mode):
 
 @pytest.mark.parametrize("search_term", [None, "", "   "])
 @pytest.mark.parametrize("list_mode", ["turn", "session"])
-def test_search_story_dialogues_with_empty_term(
+def test_search_session_dialogues_with_empty_term(
     engine,
     search_term,
     list_mode,
@@ -496,13 +496,13 @@ def test_search_story_dialogues_with_empty_term(
     )
 
     if list_mode == "turn":
-        results = engine.list_story_dialogues_for_turn(
+        results = engine.list_session_dialogues_for_turn(
             turn.id,
             search_term=search_term,
         )
     else:
         results = (
-            engine.list_story_dialogues_for_session_narrative(
+            engine.list_session_dialogues_for_session_narrative(
                 narrative.id,
                 search_term=search_term,
             )
@@ -511,7 +511,7 @@ def test_search_story_dialogues_with_empty_term(
     assert len(results) == 2
 
 
-def test_search_story_dialogues_respects_scope(engine):
+def test_search_session_dialogues_respects_scope(engine):
     first_session = create_sample_session(engine)
     second_session = create_sample_session(engine)
 
@@ -531,12 +531,12 @@ def test_search_story_dialogues_respects_scope(engine):
         engine, other_session_turn.id, "문을 닫는다"
     )
 
-    turn_results = engine.list_story_dialogues_for_turn(
+    turn_results = engine.list_session_dialogues_for_turn(
         first_turn.id,
         search_term="문을",
     )
     session_results = (
-        engine.list_story_dialogues_for_session_narrative(
+        engine.list_session_dialogues_for_session_narrative(
             first_session.id,
             search_term="문을",
         )
@@ -550,45 +550,45 @@ def test_search_story_dialogues_respects_scope(engine):
 
 # UPDATE
 
-def test_update_story_dialogue(engine):
+def test_update_session_dialogue(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     created = create_sample_dialogue(engine, turn.id)
 
-    updated = engine.update_story_dialogue(
+    updated = engine.update_session_dialogue(
         created.id,
         content="새로운 내레이션",
         position=2,
     )
 
-    assert isinstance(updated, StoryDialogueRetrieve)
+    assert isinstance(updated, SessionDialogueRetrieve)
     assert updated.id == created.id
-    assert updated.story_turn_id == turn.id
+    assert updated.session_turn_id == turn.id
     assert updated.content == "새로운 내레이션"
     assert updated.position == 2
     assert updated.kind == DialogueType.Narration
     assert updated.speaker_id is None
 
-    retrieved = engine.get_story_dialogue(created.id)
+    retrieved = engine.get_session_dialogue(created.id)
 
     assert retrieved.model_dump() == updated.model_dump()
 
 
-def test_update_story_dialogue_content_only(engine):
+def test_update_session_dialogue_content_only(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
     character = create_sample_character(engine, narrative.id)
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         content="안녕?",
         kind=DialogueType.Dialogue,
         speaker_id=character.id,
     )
 
-    updated = engine.update_story_dialogue(
+    updated = engine.update_session_dialogue(
         created.id,
         content="거기 누구 있어?",
     )
@@ -599,7 +599,7 @@ def test_update_story_dialogue_content_only(engine):
     assert updated.speaker_id == character.id
 
 
-def test_update_story_dialogue_speaker(engine):
+def test_update_session_dialogue_speaker(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
@@ -612,39 +612,39 @@ def test_update_story_dialogue_speaker(engine):
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         content="안녕",
         kind=DialogueType.Dialogue,
         speaker_id=first_character.id,
     )
 
-    updated = engine.update_story_dialogue(
+    updated = engine.update_session_dialogue(
         created.id,
         speaker_id=second_character.id,
     )
 
     assert updated.speaker_id == second_character.id
     assert updated.kind == DialogueType.Dialogue
-    assert engine.get_story_dialogue(
+    assert engine.get_session_dialogue(
         created.id
     ).speaker_id == second_character.id
 
 
-def test_update_story_dialogue_change_kind(engine):
+def test_update_session_dialogue_change_kind(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
     character = create_sample_character(engine, narrative.id)
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         content="안녕!",
         kind=DialogueType.Dialogue,
         speaker_id=character.id,
     )
 
     # Dialogue -> Narration
-    updated = engine.update_story_dialogue(
+    updated = engine.update_session_dialogue(
         created.id,
         kind=DialogueType.Narration,
         speaker_id=None,
@@ -654,7 +654,7 @@ def test_update_story_dialogue_change_kind(engine):
     assert updated.speaker_id is None
 
     # Narration -> Dialogue
-    updated = engine.update_story_dialogue(
+    updated = engine.update_session_dialogue(
         created.id,
         kind=DialogueType.Dialogue,
         speaker_id=character.id,
@@ -663,16 +663,16 @@ def test_update_story_dialogue_change_kind(engine):
     assert updated.kind == DialogueType.Dialogue
     assert updated.speaker_id == character.id
 
-    assert engine.get_story_dialogue(created.id) == updated
+    assert engine.get_session_dialogue(created.id) == updated
 
 
-def test_update_story_dialogue_without_changes(engine):
+def test_update_session_dialogue_without_changes(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
     created = create_sample_dialogue(engine, turn.id)
 
-    updated = engine.update_story_dialogue(created.id)
+    updated = engine.update_session_dialogue(created.id)
 
     assert updated.model_dump() == created.model_dump()
 
@@ -685,11 +685,11 @@ def test_update_story_dialogue_without_changes(engine):
         ({"kind": None}, InvalidOperationError),
         ({"position": -1}, ValidationError),
         ({"kind": "InvalidType"}, ValidationError),
-        ({"story_turn_id": 999}, ValidationError),
+        ({"session_turn_id": 999}, ValidationError),
         ({"unknown_field": "value"}, ValidationError),
     ],
 )
-def test_update_story_dialogue_invalid_data(
+def test_update_session_dialogue_invalid_data(
     engine,
     changes,
     expected_exception,
@@ -700,12 +700,12 @@ def test_update_story_dialogue_invalid_data(
     created = create_sample_dialogue(engine, turn.id)
 
     with pytest.raises(expected_exception):
-        engine.update_story_dialogue(
+        engine.update_session_dialogue(
             created.id,
             **changes,
         )
 
-    assert engine.get_story_dialogue(created.id) == created
+    assert engine.get_session_dialogue(created.id) == created
 
 
 @pytest.mark.parametrize(
@@ -725,12 +725,12 @@ def test_update_narration_invalid_speaker_state(
     created = create_sample_dialogue(engine, turn.id)
 
     with pytest.raises(InvalidOperationError):
-        engine.update_story_dialogue(
+        engine.update_session_dialogue(
             created.id,
             **changes,
         )
 
-    assert engine.get_story_dialogue(created.id) == created
+    assert engine.get_session_dialogue(created.id) == created
 
 
 @pytest.mark.parametrize(
@@ -750,43 +750,43 @@ def test_update_dialogue_invalid_speaker_state(
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         kind=DialogueType.Dialogue,
         speaker_id=character.id,
     )
 
     with pytest.raises(InvalidOperationError):
-        engine.update_story_dialogue(
+        engine.update_session_dialogue(
             created.id,
             **changes,
         )
 
-    assert engine.get_story_dialogue(created.id) == created
+    assert engine.get_session_dialogue(created.id) == created
 
 
-def test_update_story_dialogue_missing_speaker(engine):
+def test_update_session_dialogue_missing_speaker(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
     character = create_sample_character(engine, narrative.id)
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         kind=DialogueType.Dialogue,
         speaker_id=character.id,
     )
 
     with pytest.raises(ResourceNotFoundError) as exc_info:
-        engine.update_story_dialogue(
+        engine.update_session_dialogue(
             created.id,
             speaker_id=999999,
         )
 
     assert exc_info.value.resource == "SessionCharacter"
-    assert engine.get_story_dialogue(created.id) == created
+    assert engine.get_session_dialogue(created.id) == created
 
 
-def test_update_story_dialogue_other_session_speaker(engine):
+def test_update_session_dialogue_other_session_speaker(engine):
     first_session = create_sample_session(engine)
     second_session = create_sample_session(engine)
 
@@ -801,23 +801,23 @@ def test_update_story_dialogue_other_session_speaker(engine):
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         kind=DialogueType.Dialogue,
         speaker_id=first_character.id,
     )
 
     with pytest.raises(InvalidOperationError):
-        engine.update_story_dialogue(
+        engine.update_session_dialogue(
             created.id,
             speaker_id=other_character.id,
         )
 
-    assert engine.get_story_dialogue(
+    assert engine.get_session_dialogue(
         created.id
     ).speaker_id == first_character.id
 
 
-def test_update_story_dialogue_duplicate_position(engine):
+def test_update_session_dialogue_duplicate_position(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
@@ -829,18 +829,18 @@ def test_update_story_dialogue_duplicate_position(engine):
     )
 
     with pytest.raises(IntegrityError):
-        engine.update_story_dialogue(
+        engine.update_session_dialogue(
             second.id,
             position=0,
         )
 
-    assert engine.get_story_dialogue(first.id).position == 0
-    assert engine.get_story_dialogue(second.id).position == 1
+    assert engine.get_session_dialogue(first.id).position == 0
+    assert engine.get_session_dialogue(second.id).position == 1
 
 
 # DELETE
 
-def test_delete_story_dialogue(engine):
+def test_delete_session_dialogue(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
@@ -851,42 +851,42 @@ def test_delete_story_dialogue(engine):
         engine, turn.id, "두 번째 문장", position=1
     )
 
-    engine.delete_story_dialogue(first.id)
+    engine.delete_session_dialogue(first.id)
 
     with pytest.raises(ResourceNotFoundError):
-        engine.get_story_dialogue(first.id)
+        engine.get_session_dialogue(first.id)
 
-    assert engine.get_story_dialogue(second.id).id == second.id
+    assert engine.get_session_dialogue(second.id).id == second.id
 
-    results = engine.list_story_dialogues_for_turn(turn.id)
+    results = engine.list_session_dialogues_for_turn(turn.id)
     assert [item.id for item in results] == [second.id]
 
-    # Deleting a dialogue must not delete its StoryTurn.
-    assert engine.get_story_turn(turn.id).id == turn.id
+    # Deleting a dialogue must not delete its SessionTurn.
+    assert engine.get_session_turn(turn.id).id == turn.id
 
 
-def test_delete_story_dialogue_preserves_character(engine):
+def test_delete_session_dialogue_preserves_character(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
     character = create_sample_character(engine, narrative.id)
 
     created = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         kind=DialogueType.Dialogue,
         speaker_id=character.id,
     )
 
-    engine.delete_story_dialogue(created.id)
+    engine.delete_session_dialogue(created.id)
 
     assert engine.get_session_character(
         character.id
     ).id == character.id
 
-    assert engine.get_story_turn(turn.id).story_dialogues == []
+    assert engine.get_session_turn(turn.id).session_dialogues == []
 
 
-def test_delete_story_turn_cascades_story_dialogues(engine):
+def test_delete_session_turn_cascades_session_dialogues(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
 
@@ -897,28 +897,28 @@ def test_delete_story_turn_cascades_story_dialogues(engine):
         engine, turn.id, "두 번째", position=1
     )
 
-    engine.delete_story_turn(turn.id)
+    engine.delete_session_turn(turn.id)
 
     for dialogue in [first, second]:
         with pytest.raises(ResourceNotFoundError):
-            engine.get_story_dialogue(dialogue.id)
+            engine.get_session_dialogue(dialogue.id)
 
-    assert engine.list_story_dialogues_for_turn(turn.id) == []
+    assert engine.list_session_dialogues_for_turn(turn.id) == []
 
 
-def test_delete_session_cascades_story_dialogues(engine):
+def test_delete_session_cascades_session_dialogues(engine):
     narrative = create_sample_session(engine)
     turn = create_sample_turn(engine, narrative.id)
     character = create_sample_character(engine, narrative.id)
 
     narration = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         position=0,
     )
     dialogue = create_sample_dialogue(
         engine,
-        story_turn_id=turn.id,
+        session_turn_id=turn.id,
         content="누구냐!",
         position=1,
         kind=DialogueType.Dialogue,
@@ -929,10 +929,10 @@ def test_delete_session_cascades_story_dialogues(engine):
 
     for item in [narration, dialogue]:
         with pytest.raises(ResourceNotFoundError):
-            engine.get_story_dialogue(item.id)
+            engine.get_session_dialogue(item.id)
 
     assert (
-        engine.list_story_dialogues_for_session_narrative(
+        engine.list_session_dialogues_for_session_narrative(
             narrative.id
         ) == []
     )
@@ -944,28 +944,28 @@ def test_delete_session_cascades_story_dialogues(engine):
     "operation",
     ["get", "update", "delete"],
 )
-def test_story_dialogue_not_found(engine, operation):
+def test_session_dialogue_not_found(engine, operation):
     nonexistent_id = 999999
 
     with pytest.raises(ResourceNotFoundError) as exc_info:
         if operation == "get":
-            engine.get_story_dialogue(nonexistent_id)
+            engine.get_session_dialogue(nonexistent_id)
         elif operation == "update":
-            engine.update_story_dialogue(
+            engine.update_session_dialogue(
                 nonexistent_id,
                 content="Updated",
             )
         else:
-            engine.delete_story_dialogue(nonexistent_id)
+            engine.delete_session_dialogue(nonexistent_id)
 
-    assert exc_info.value.resource == "StoryDialogue"
+    assert exc_info.value.resource == "SessionDialogue"
     assert exc_info.value.resource_id == nonexistent_id
 
 
 # PERSISTENCE
 
-def test_story_dialogue_persistence(tmp_path):
-    db_path = str(tmp_path / "story_dialogue_persistence.db")
+def test_session_dialogue_persistence(tmp_path):
+    db_path = str(tmp_path / "session_dialogue_persistence.db")
 
     first_engine = NarrativeEngine(db_path)
 
@@ -984,7 +984,7 @@ def test_story_dialogue_persistence(tmp_path):
 
         created = create_sample_dialogue(
             first_engine,
-            story_turn_id=turn.id,
+            session_turn_id=turn.id,
             content="여기가 어디지?",
             position=0,
             kind=DialogueType.Dialogue,
@@ -1004,24 +1004,24 @@ def test_story_dialogue_persistence(tmp_path):
     try:
         second_engine.initialize()
 
-        retrieved = second_engine.get_story_dialogue(
+        retrieved = second_engine.get_session_dialogue(
             dialogue_id
         )
 
         assert retrieved.id == dialogue_id
-        assert retrieved.story_turn_id == turn_id
+        assert retrieved.session_turn_id == turn_id
         assert retrieved.content == "여기가 어디지?"
         assert retrieved.position == 0
         assert retrieved.kind == DialogueType.Dialogue
         assert retrieved.speaker_id == character_id
 
         turn_results = (
-            second_engine.list_story_dialogues_for_turn(
+            second_engine.list_session_dialogues_for_turn(
                 turn_id
             )
         )
         session_results = (
-            second_engine.list_story_dialogues_for_session_narrative(
+            second_engine.list_session_dialogues_for_session_narrative(
                 narrative_id
             )
         )

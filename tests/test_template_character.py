@@ -4,15 +4,15 @@ from pydantic import ValidationError
 
 from narrative_engine.engine import NarrativeEngine
 from narrative_engine.exceptions import ResourceNotFoundError
-from narrative_engine.domain.schemas.character_template import (
-    CharacterTemplateRetrieve,
-    CharacterTemplateList,
+from narrative_engine.domain.schemas.template_character import (
+    TemplateCharacterRetrieve,
+    TemplateCharacterList,
 )
 
 
 # 테스트 데이터 생성 헬퍼
 def create_sample_narrative(engine):
-    return engine.create_narrative_template(
+    return engine.create_template_narrative(
         name="Alien Invasion",
         world_description="외계인이 침략한 지구",
         initial_situation="Sarah는 폐허에서 깨어났다.",
@@ -22,11 +22,11 @@ def create_sample_narrative(engine):
 
 def create_sample_character(
     engine,
-    narrative_template_id,
+    template_narrative_id,
     name="Sarah",
 ):
-    return engine.create_character_template(
-        narrative_template_id=narrative_template_id,
+    return engine.create_template_character(
+        template_narrative_id=template_narrative_id,
         name=name,
         background_description="외계인 침공에서 살아남은 생존자",
         initial_status="폐허에서 깨어난 상태",
@@ -42,7 +42,7 @@ def test_create_character(engine):
         narrative.id,
     )
 
-    assert isinstance(character, CharacterTemplateRetrieve)
+    assert isinstance(character, TemplateCharacterRetrieve)
     assert isinstance(character.id, int)
     assert character.id > 0
     assert character.name == "Sarah"
@@ -50,7 +50,7 @@ def test_create_character(engine):
         "외계인 침공에서 살아남은 생존자"
     )
     assert character.initial_status == "폐허에서 깨어난 상태"
-    assert character.narrative_template_id == narrative.id
+    assert character.template_narrative_id == narrative.id
 
 
 # READ
@@ -58,7 +58,7 @@ def test_get_character(engine):
     narrative = create_sample_narrative(engine)
     created = create_sample_character(engine, narrative.id)
 
-    retrieved = engine.get_character_template(created.id)
+    retrieved = engine.get_template_character(created.id)
 
     assert retrieved.id == created.id
     assert retrieved.name == created.name
@@ -66,7 +66,7 @@ def test_get_character(engine):
         created.background_description
     )
     assert retrieved.initial_status == created.initial_status
-    assert retrieved.narrative_template_id == narrative.id
+    assert retrieved.template_narrative_id == narrative.id
 
 
 # LIST
@@ -77,11 +77,11 @@ def test_list_characters(engine):
     create_sample_character(engine, narrative.id, "John")
     create_sample_character(engine, narrative.id, "Alex")
 
-    characters = engine.list_character_templates()
+    characters = engine.list_template_characters()
 
     assert len(characters) == 3
     assert all(
-        isinstance(character, CharacterTemplateList)
+        isinstance(character, TemplateCharacterList)
         for character in characters
     )
 
@@ -95,7 +95,7 @@ def test_list_character_fields(engine):
     narrative = create_sample_narrative(engine)
     create_sample_character(engine, narrative.id)
 
-    characters = engine.list_character_templates()
+    characters = engine.list_template_characters()
     character = characters[0]
 
     assert set(character.model_dump().keys()) == {
@@ -113,7 +113,7 @@ def test_search_characters(engine):
     create_sample_character(engine, narrative.id, "Sam")
     create_sample_character(engine, narrative.id, "John")
 
-    results = engine.list_character_templates(
+    results = engine.list_template_characters(
         search_term="Sa"
     )
 
@@ -128,7 +128,7 @@ def test_update_character(engine):
     narrative = create_sample_narrative(engine)
     created = create_sample_character(engine, narrative.id)
 
-    updated = engine.update_character_template(
+    updated = engine.update_template_character(
         created.id,
         name="Updated Sarah",
         initial_status="부상을 입은 상태",
@@ -140,10 +140,10 @@ def test_update_character(engine):
         updated.background_description
         == created.background_description
     )
-    assert updated.narrative_template_id == narrative.id
+    assert updated.template_narrative_id == narrative.id
 
     # DB에서 다시 조회하여 실제 저장 여부 확인
-    retrieved = engine.get_character_template(created.id)
+    retrieved = engine.get_template_character(created.id)
 
     assert retrieved.name == "Updated Sarah"
     assert retrieved.initial_status == "부상을 입은 상태"
@@ -166,7 +166,7 @@ def test_update_character_invalid_data(engine, update_data):
     created = create_sample_character(engine, narrative.id)
 
     with pytest.raises(ValidationError):
-        engine.update_character_template(
+        engine.update_template_character(
             created.id,
             **update_data,
         )
@@ -177,10 +177,10 @@ def test_delete_character(engine):
     narrative = create_sample_narrative(engine)
     created = create_sample_character(engine, narrative.id)
 
-    engine.delete_character_template(created.id)
+    engine.delete_template_character(created.id)
 
     with pytest.raises(ResourceNotFoundError):
-        engine.get_character_template(created.id)
+        engine.get_template_character(created.id)
 
 
 # NOT FOUND
@@ -193,16 +193,16 @@ def test_character_not_found(engine, operation):
 
     with pytest.raises(ResourceNotFoundError):
         if operation == "get":
-            engine.get_character_template(nonexistent_id)
+            engine.get_template_character(nonexistent_id)
 
         elif operation == "update":
-            engine.update_character_template(
+            engine.update_template_character(
                 nonexistent_id,
                 name="Updated",
             )
 
         elif operation == "delete":
-            engine.delete_character_template(nonexistent_id)
+            engine.delete_template_character(nonexistent_id)
 
 
 # RELATIONSHIP
@@ -220,20 +220,20 @@ def test_narrative_contains_characters(engine):
         "John",
     )
 
-    retrieved = engine.get_narrative_template(narrative.id)
+    retrieved = engine.get_template_narrative(narrative.id)
 
-    assert len(retrieved.character_templates) == 2
+    assert len(retrieved.template_characters) == 2
 
     character_ids = {
         character.id
-        for character in retrieved.character_templates
+        for character in retrieved.template_characters
     }
 
     assert character_ids == {first.id, second.id}
 
     assert all(
-        isinstance(character, CharacterTemplateList)
-        for character in retrieved.character_templates
+        isinstance(character, TemplateCharacterList)
+        for character in retrieved.template_characters
     )
 
 
@@ -252,13 +252,13 @@ def test_delete_narrative_deletes_characters(engine):
         "John",
     )
 
-    engine.delete_narrative_template(narrative.id)
+    engine.delete_template_narrative(narrative.id)
 
     with pytest.raises(ResourceNotFoundError):
-        engine.get_character_template(first.id)
+        engine.get_template_character(first.id)
 
     with pytest.raises(ResourceNotFoundError):
-        engine.get_character_template(second.id)
+        engine.get_template_character(second.id)
 
 
 # PERSISTENCE
@@ -288,13 +288,13 @@ def test_character_persistence(tmp_path):
     try:
         second_engine.initialize()
 
-        retrieved = second_engine.get_character_template(
+        retrieved = second_engine.get_template_character(
             character_id
         )
 
         assert retrieved.id == character_id
         assert retrieved.name == "Sarah"
-        assert retrieved.narrative_template_id == narrative_id
+        assert retrieved.template_narrative_id == narrative_id
 
     finally:
         second_engine.close()

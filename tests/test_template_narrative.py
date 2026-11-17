@@ -7,7 +7,7 @@ from narrative_engine.exceptions import ResourceNotFoundError
 
 # 테스트 데이터 생성 헬퍼
 def create_sample_template(engine, name="Alien Invasion"):
-    return engine.create_narrative_template(
+    return engine.create_template_narrative(
         name=name,
         world_description="외계인이 침략한 지구",
         initial_situation="Sarah는 폐허에서 깨어났다.",
@@ -29,7 +29,7 @@ def test_create_template(engine):
 def test_get_template(engine):
     created = create_sample_template(engine)
 
-    retrieved = engine.get_narrative_template(created.id)
+    retrieved = engine.get_template_narrative(created.id)
 
     assert retrieved.id == created.id
     assert retrieved.name == created.name
@@ -42,7 +42,7 @@ def test_list_templates(engine):
     create_sample_template(engine, "Medieval Fantasy")
     create_sample_template(engine, "Alien Planet")
 
-    templates = engine.list_narrative_templates()
+    templates = engine.list_template_narratives()
 
     assert len(templates) == 3
 
@@ -60,7 +60,7 @@ def test_search_templates(engine):
     create_sample_template(engine, "Medieval Fantasy")
     create_sample_template(engine, "Alien Planet")
 
-    results = engine.list_narrative_templates(
+    results = engine.list_template_narratives(
         search_term="Alien"
     )
 
@@ -72,7 +72,7 @@ def test_search_templates(engine):
 def test_update_template(engine):
     created = create_sample_template(engine)
 
-    updated = engine.update_narrative_template(
+    updated = engine.update_template_narrative(
         created.id,
         name="Updated Alien Invasion",
     )
@@ -82,7 +82,7 @@ def test_update_template(engine):
     assert updated.initial_situation == created.initial_situation
 
     # DB에서 다시 조회하여 실제 저장 여부 확인
-    retrieved = engine.get_narrative_template(created.id)
+    retrieved = engine.get_template_narrative(created.id)
 
     assert retrieved.name == "Updated Alien Invasion"
 
@@ -91,10 +91,10 @@ def test_update_template(engine):
 def test_delete_template(engine):
     created = create_sample_template(engine)
 
-    engine.delete_narrative_template(created.id)
+    engine.delete_template_narrative(created.id)
 
     with pytest.raises(ResourceNotFoundError):
-        engine.get_narrative_template(created.id)
+        engine.get_template_narrative(created.id)
 
 
 # NOT FOUND
@@ -107,16 +107,16 @@ def test_template_not_found(engine, operation):
 
     with pytest.raises(ResourceNotFoundError):
         if operation == "get":
-            engine.get_narrative_template(nonexistent_id)
+            engine.get_template_narrative(nonexistent_id)
 
         elif operation == "update":
-            engine.update_narrative_template(
+            engine.update_template_narrative(
                 nonexistent_id,
                 name="Updated",
             )
 
         elif operation == "delete":
-            engine.delete_narrative_template(nonexistent_id)
+            engine.delete_template_narrative(nonexistent_id)
 
 
 # PERSISTENCE
@@ -137,7 +137,7 @@ def test_template_persistence(tmp_path):
 
     try:
         second_engine.initialize()
-        retrieved = second_engine.get_narrative_template(
+        retrieved = second_engine.get_template_narrative(
             template_id
         )
 

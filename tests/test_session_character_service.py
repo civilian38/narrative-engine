@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from narrative_engine.domain.models import (
     SessionCharacter, SessionCharacterOpinion, SessionNarrative,
-    StoryDialogue, StoryTurn, DialogueType,
+    SessionDialogue, SessionTurn, DialogueType,
 )
 from narrative_engine.exceptions import InvalidOperationError, ResourceNotFoundError
 
@@ -26,10 +26,10 @@ def story(engine):
     narrative_id = narrative(engine)
     person = character(engine, narrative_id)
     with engine.database.session() as session:
-        turn = StoryTurn(session_narrative_id=narrative_id, turn_index=0, user_input="Go")
+        turn = SessionTurn(session_narrative_id=narrative_id, turn_index=0, user_input="Go")
         session.add(turn)
         session.flush()
-        line = StoryDialogue(story_turn_id=turn.id, position=0,
+        line = SessionDialogue(session_turn_id=turn.id, position=0,
                              kind=DialogueType.Dialogue, speaker_id=person.id, content="Hello")
         session.add(line)
         session.flush()
@@ -93,8 +93,8 @@ def test_opinions_are_serializable_after_session_close(engine):
     a, b = character(engine, parent), character(engine, parent, "Bob")
     with engine.database.session() as session:
         session.add_all([
-            SessionCharacterOpinion(from_character_id=a.id, to_character_id=b.id, opinion="Trust"),
-            SessionCharacterOpinion(from_character_id=b.id, to_character_id=a.id, opinion="Respect"),
+            SessionCharacterOpinion(session_narrative_id=parent, from_character_id=a.id, to_character_id=b.id, opinion="Trust"),
+            SessionCharacterOpinion(session_narrative_id=parent, from_character_id=b.id, to_character_id=a.id, opinion="Respect"),
         ])
     result = engine.get_session_character(a.id)
     assert result.opinions_to_others[0].opinion == "Trust"
@@ -121,8 +121,8 @@ def test_referenced_delete_rejects_before_any_write(engine):
         event.remove(engine.database.engine, "before_cursor_execute", capture)
     assert writes == []
     with engine.database.session() as session:
-        dialogue = session.get(StoryDialogue, line)
-        assert (dialogue.speaker_id, dialogue.content, dialogue.story_turn_id) == (person, "Hello", turn)
+        dialogue = session.get(SessionDialogue, line)
+        assert (dialogue.speaker_id, dialogue.content, dialogue.session_turn_id) == (person, "Hello", turn)
         assert session.get(SessionCharacter, person) is not None
         assert session.get(SessionNarrative, parent) is not None
     # The failed operation must not poison later transactions.
@@ -135,8 +135,8 @@ def test_unreferenced_delete_preserves_existing_story(engine):
     engine.delete_session_character(other.id)
     with engine.database.session() as session:
         assert session.get(SessionCharacter, other.id) is None
-        assert session.get(StoryDialogue, line).speaker_id == speaker
-        assert session.get(StoryTurn, turn) is not None
+        assert session.get(SessionDialogue, line).speaker_id == speaker
+        assert session.get(SessionTurn, turn) is not None
 
 
 @pytest.mark.parametrize("mode", ["service", "sql", "loaded_orm"])
@@ -145,7 +145,7 @@ def test_whole_narrative_delete_cascades(engine, mode):
     survivor = story(engine)
     with engine.database.engine.connect() as connection:
         assert connection.scalar(text("PRAGMA foreign_keys")) == 1
-        ddl = connection.scalar(text("SELECT sql FROM sqlite_master WHERE name='story_dialogue'"))
+        ddl = connection.scalar(text("SELECT sql FROM sqlite_master WHERE name='session_dialogue'"))
         assert "NO ACTION" in ddl and "DEFERRABLE INITIALLY DEFERRED" in ddl
     if mode == "service":
         engine.delete_session_narrative(parent)
@@ -156,11 +156,11 @@ def test_whole_narrative_delete_cascades(engine, mode):
             else:
                 item = session.get(SessionNarrative, parent)
                 assert item.session_characters[0].dialogues
-                assert item.story_turns[0].story_dialogues
+                assert item.session_turns[0].session_dialogues
                 session.delete(item)
     with engine.database.session() as session:
         for model, removed, kept in zip(
-            (SessionNarrative, SessionCharacter, StoryTurn, StoryDialogue),
+            (SessionNarrative, SessionCharacter, SessionTurn, SessionDialogue),
             (parent, person, turn, line), survivor,
         ):
             assert session.get(model, removed) is None
@@ -175,5 +175,5 @@ def test_database_deferred_fk_still_protects_direct_delete(engine):
             session.flush()  # NO ACTION is checked at commit, not here.
             assert session.get(SessionCharacter, person) is None
     with engine.database.session() as session:
-        assert session.get(StoryDialogue, line).speaker_id == person
+        assert session.get(SessionDialogue, line).speaker_id == person
         assert session.get(SessionCharacter, person) is not None

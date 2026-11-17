@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from narrative_engine.domain.database import Database
-from narrative_engine.domain.models import NarrativeTemplate, SessionNarrative, SessionCharacter
+from narrative_engine.domain.models import TemplateNarrative, SessionNarrative, SessionCharacter
 from narrative_engine.domain.schemas.session_narrative import SessionNarrativeRetrieve, SessionNarrativeList, \
     SessionNarrativeUpdate, SessionNarrativeCreate
 from narrative_engine.exceptions import ResourceNotFoundError
@@ -14,29 +14,29 @@ class SessionNarrativeService:
 
     def create(
             self,
-            narrative_template_id: int,
+            template_narrative_id: int,
             title: str | None = None,
     ) -> SessionNarrativeRetrieve:
 
         with self.database.session() as session:
             template = session.get(
-                NarrativeTemplate,
-                narrative_template_id,
+                TemplateNarrative,
+                template_narrative_id,
                 options=[
                     selectinload(
-                        NarrativeTemplate.character_templates
+                        TemplateNarrative.template_characters
                     )
                 ],
             )
 
             if template is None:
                 raise ResourceNotFoundError(
-                    resource="NarrativeTemplate",
-                    resource_id=narrative_template_id,
+                    resource="TemplateNarrative",
+                    resource_id=template_narrative_id,
                 )
 
             data = SessionNarrativeCreate(
-                narrative_template_id=narrative_template_id,
+                template_narrative_id=template_narrative_id,
                 title=title if title is not None else template.name,
                 world_description=template.world_description,
                 situation=template.initial_situation,
@@ -50,7 +50,7 @@ class SessionNarrativeService:
                         background_description=character.background_description,
                         status=character.initial_status,
                     )
-                    for character in template.character_templates
+                    for character in template.template_characters
                 ],
             )
 

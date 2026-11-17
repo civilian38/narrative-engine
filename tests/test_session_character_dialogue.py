@@ -1,4 +1,4 @@
-"""SessionCharacter 삭제 정책 및 StoryDialogue 무결성 통합 테스트.
+"""SessionCharacter 삭제 정책 및 SessionDialogue 무결성 통합 테스트.
 
 기존 tests/conftest.py의 engine fixture(임시 SQLite DB + Alembic migration)를 사용한다.
 
@@ -16,8 +16,8 @@ from narrative_engine.domain.models import (
     DialogueType,
     SessionCharacter,
     SessionNarrative,
-    StoryDialogue,
-    StoryTurn,
+    SessionDialogue,
+    SessionTurn,
 )
 
 
@@ -35,7 +35,7 @@ def create_story_data(engine, *, with_dialogue=True, with_narration=True):
             status="건강함",
             session_narrative=narrative,
         )
-        turn = StoryTurn(
+        turn = SessionTurn(
             turn_index=0,
             user_input="성문이 열린다.",
             session_narrative=narrative,
@@ -46,8 +46,8 @@ def create_story_data(engine, *, with_dialogue=True, with_narration=True):
         dialogues = []
         if with_narration:
             dialogues.append(
-                StoryDialogue(
-                    story_turn=turn,
+                SessionDialogue(
+                    session_turn=turn,
                     position=len(dialogues),
                     kind=DialogueType.Narration,
                     content="성문이 천천히 열렸다.",
@@ -56,8 +56,8 @@ def create_story_data(engine, *, with_dialogue=True, with_narration=True):
             )
         if with_dialogue:
             dialogues.append(
-                StoryDialogue(
-                    story_turn=turn,
+                SessionDialogue(
+                    session_turn=turn,
                     position=len(dialogues),
                     kind=DialogueType.Dialogue,
                     content="누구냐!",
@@ -84,19 +84,19 @@ def test_foreign_keys_are_enabled(engine):
     assert_fk_enabled(engine)
 
 
-def test_story_dialogues_are_ordered_and_have_correct_speakers(engine):
+def test_session_dialogues_are_ordered_and_have_correct_speakers(engine):
     data = create_story_data(engine)
 
     with engine.database.session() as session:
-        turn = session.get(StoryTurn, data["turn_id"])
+        turn = session.get(SessionTurn, data["turn_id"])
         assert turn is not None
-        assert [segment.position for segment in turn.story_dialogues] == [0, 1]
-        assert [segment.kind for segment in turn.story_dialogues] == [
+        assert [segment.position for segment in turn.session_dialogues] == [0, 1]
+        assert [segment.kind for segment in turn.session_dialogues] == [
             DialogueType.Narration,
             DialogueType.Dialogue,
         ]
-        assert turn.story_dialogues[0].speaker_id is None
-        assert turn.story_dialogues[1].speaker_id == data["character_id"]
+        assert turn.session_dialogues[0].speaker_id is None
+        assert turn.session_dialogues[1].speaker_id == data["character_id"]
 
 
 def test_delete_character_without_dialogue_succeeds(engine):
@@ -109,8 +109,8 @@ def test_delete_character_without_dialogue_succeeds(engine):
     with engine.database.session() as session:
         assert session.get(SessionCharacter, data["character_id"]) is None
         assert session.get(SessionNarrative, data["narrative_id"]) is not None
-        assert session.get(StoryTurn, data["turn_id"]) is not None
-        assert session.scalar(select(func.count()).select_from(StoryDialogue)) == 1
+        assert session.get(SessionTurn, data["turn_id"]) is not None
+        assert session.scalar(select(func.count()).select_from(SessionDialogue)) == 1
 
 
 def test_delete_character_referenced_by_dialogue_is_rejected(engine):
@@ -126,7 +126,7 @@ def test_delete_character_referenced_by_dialogue_is_rejected(engine):
     with engine.database.session() as session:
         assert session.get(SessionCharacter, data["character_id"]) is not None
         for dialogue_id in data["dialogue_ids"]:
-            assert session.get(StoryDialogue, dialogue_id) is not None
+            assert session.get(SessionDialogue, dialogue_id) is not None
 
 
 def test_delete_character_after_removing_its_dialogue_succeeds(engine):
@@ -135,9 +135,9 @@ def test_delete_character_after_removing_its_dialogue_succeeds(engine):
     with engine.database.session() as session:
         character = session.get(SessionCharacter, data["character_id"])
         dialogue = session.scalar(
-            select(StoryDialogue).where(
-                StoryDialogue.story_turn_id == data["turn_id"],
-                StoryDialogue.kind == DialogueType.Dialogue,
+            select(SessionDialogue).where(
+                SessionDialogue.session_turn_id == data["turn_id"],
+                SessionDialogue.kind == DialogueType.Dialogue,
             )
         )
         session.delete(dialogue)
@@ -146,7 +146,7 @@ def test_delete_character_after_removing_its_dialogue_succeeds(engine):
     with engine.database.session() as session:
         assert session.get(SessionCharacter, data["character_id"]) is None
         remaining = session.scalars(
-            select(StoryDialogue).where(StoryDialogue.story_turn_id == data["turn_id"])
+            select(SessionDialogue).where(SessionDialogue.session_turn_id == data["turn_id"])
         ).all()
         assert len(remaining) == 1
         assert remaining[0].kind == DialogueType.Narration
@@ -157,13 +157,13 @@ def test_delete_turn_cascades_to_dialogues_but_keeps_character(engine):
     data = create_story_data(engine)
 
     with engine.database.session() as session:
-        session.delete(session.get(StoryTurn, data["turn_id"]))
+        session.delete(session.get(SessionTurn, data["turn_id"]))
 
     with engine.database.session() as session:
-        assert session.get(StoryTurn, data["turn_id"]) is None
+        assert session.get(SessionTurn, data["turn_id"]) is None
         assert session.get(SessionCharacter, data["character_id"]) is not None
         for dialogue_id in data["dialogue_ids"]:
-            assert session.get(StoryDialogue, dialogue_id) is None
+            assert session.get(SessionDialogue, dialogue_id) is None
 
 
 @pytest.mark.parametrize("load_relationships", [False, True])
@@ -177,16 +177,16 @@ def test_delete_narrative_cascades_to_characters_turns_and_dialogues(
         if load_relationships:
             # ORM에 관계들이 이미 로드된 경우도 확인한다.
             assert len(narrative.session_characters) == 1
-            assert len(narrative.story_turns) == 1
-            assert len(narrative.story_turns[0].story_dialogues) == 2
+            assert len(narrative.session_turns) == 1
+            assert len(narrative.session_turns[0].session_dialogues) == 2
         session.delete(narrative)
 
     with engine.database.session() as session:
         assert session.get(SessionNarrative, data["narrative_id"]) is None
         assert session.get(SessionCharacter, data["character_id"]) is None
-        assert session.get(StoryTurn, data["turn_id"]) is None
+        assert session.get(SessionTurn, data["turn_id"]) is None
         for dialogue_id in data["dialogue_ids"]:
-            assert session.get(StoryDialogue, dialogue_id) is None
+            assert session.get(SessionDialogue, dialogue_id) is None
 
 
 @pytest.mark.parametrize(
@@ -201,8 +201,8 @@ def test_kind_speaker_check_constraint(engine, kind, speaker_mode):
 
     with pytest.raises(IntegrityError):
         with engine.database.session() as session:
-            segment = StoryDialogue(
-                story_turn_id=data["turn_id"],
+            segment = SessionDialogue(
+                session_turn_id=data["turn_id"],
                 position=0,
                 kind=kind,
                 speaker_id=(
@@ -220,8 +220,8 @@ def test_duplicate_dialogue_position_is_rejected(engine):
     with pytest.raises(IntegrityError):
         with engine.database.session() as session:
             session.add(
-                StoryDialogue(
-                    story_turn_id=data["turn_id"],
+                SessionDialogue(
+                    session_turn_id=data["turn_id"],
                     position=0,
                     kind=DialogueType.Narration,
                     content="중복된 위치",
@@ -237,8 +237,8 @@ def test_negative_dialogue_position_is_rejected(engine):
     with pytest.raises(IntegrityError):
         with engine.database.session() as session:
             session.add(
-                StoryDialogue(
-                    story_turn_id=data["turn_id"],
+                SessionDialogue(
+                    session_turn_id=data["turn_id"],
                     position=-1,
                     kind=DialogueType.Narration,
                     content="음수 위치",
