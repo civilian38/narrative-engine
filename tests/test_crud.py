@@ -42,9 +42,14 @@ def test_session_narrative_snapshot_and_crud(engine):
 
 def test_session_character_opinion_crud(engine):
     template = engine.create_template_narrative("Quest", "World", "Start")
+    engine.create_template_character(template.id, "Alice", "A", "Well")
+    engine.create_template_character(template.id, "Bob", "B", "Well")
     story = engine.create_session_narrative(template.id)
-    alice = engine.create_session_character(story.id, "Alice", "A", "Well")
-    bob = engine.create_session_character(story.id, "Bob", "B", "Well")
+    alice, bob = story.session_characters
+    assert [(c.name, c.background_description, c.status) for c in (alice, bob)] == [
+        ("Alice", "A", "Well"),
+        ("Bob", "B", "Well"),
+    ]
     assert engine.get_session_character(alice.id).name == "Alice"
     assert [c.id for c in engine.list_session_characters(session_narrative_id=story.id)] == [alice.id, bob.id]
     assert engine.update_session_character(alice.id, status="Tired").status == "Tired"
@@ -56,6 +61,21 @@ def test_session_character_opinion_crud(engine):
     assert engine.list_session_character_opinions(story.id) == []
     engine.delete_session_character(alice.id)
     assert [c.id for c in engine.list_session_characters(session_narrative_id=story.id)] == [bob.id]
+
+
+def test_directly_add_session_character_alongside_template_character(engine):
+    template = engine.create_template_narrative("Quest", "World", "Start")
+    engine.create_template_character(template.id, "Mira", "Scout", "Healthy")
+    story = engine.create_session_narrative(template.id)
+
+    mira = story.session_characters[0]
+    directly_added = engine.create_session_character(story.id, "Rook", "Guide", "Well")
+
+    assert [c.id for c in engine.list_session_characters(session_narrative_id=story.id)] == [
+        mira.id,
+        directly_added.id,
+    ]
+    assert engine.get_session_character(directly_added.id).name == "Rook"
 
 
 def test_turn_dialogue_crud_order_and_cascades(engine):
