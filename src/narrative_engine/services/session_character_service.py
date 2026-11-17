@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from narrative_engine.domain.database import Database
-from narrative_engine.domain.models import SessionCharacter, SessionNarrative, StoryDialogue
+from narrative_engine.domain.models import SessionCharacter, SessionNarrative, SessionDialogue
 from narrative_engine.domain.schemas.session_character import (
     SessionCharacterCreate,
     SessionCharacterRetrieve, SessionCharacterList, SessionCharacterUpdate,
@@ -142,12 +142,12 @@ class SessionCharacterService:
             # Reject before scheduling any deletion; preserve all story history.
             # The deferred FK remains the database-level integrity safeguard.
             referenced = session.scalar(
-                select(StoryDialogue.id)
-                .where(StoryDialogue.speaker_id == id)
+                select(SessionDialogue.id)
+                .where(SessionDialogue.speaker_id == id)
                 .limit(1)
             )
             if referenced is not None:
                 raise InvalidOperationError(
-                    f"SessionCharacter with id={id} is referenced by StoryDialogue"
+                    f"SessionCharacter with id={id} is referenced by SessionDialogue"
                 )
             session.delete(character)

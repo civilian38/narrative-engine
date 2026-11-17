@@ -15,8 +15,8 @@ class Base(DeclarativeBase):
     pass
 
 
-class NarrativeTemplate(Base):
-    __tablename__ = "narrative_template"
+class TemplateNarrative(Base):
+    __tablename__ = "template_narrative"
 
     id: Mapped[int] = mapped_column(
         primary_key=True
@@ -42,20 +42,20 @@ class NarrativeTemplate(Base):
         nullable=False
     )
 
-    character_templates: Mapped[List["CharacterTemplate"]] = relationship(
-        back_populates="narrative_template",
+    template_characters: Mapped[List["TemplateCharacter"]] = relationship(
+        back_populates="template_narrative",
         cascade="all, delete-orphan",
         passive_deletes=True
     )
 
     session_narratives: Mapped[List["SessionNarrative"]] = relationship(
-        back_populates="narrative_template",
+        back_populates="template_narrative",
         passive_deletes=True,
     )
 
 
-class CharacterTemplate(Base):
-    __tablename__ = "character_template"
+class TemplateCharacter(Base):
+    __tablename__ = "template_character"
 
     id: Mapped[int] = mapped_column(
         primary_key=True
@@ -76,13 +76,13 @@ class CharacterTemplate(Base):
         nullable=False
     )
 
-    narrative_template_id: Mapped[int] = mapped_column(
-        ForeignKey('narrative_template.id', ondelete='CASCADE'),
+    template_narrative_id: Mapped[int] = mapped_column(
+        ForeignKey('template_narrative.id', ondelete='CASCADE'),
         nullable=False
     )
 
-    narrative_template: Mapped["NarrativeTemplate"] = relationship(
-        back_populates='character_templates'
+    template_narrative: Mapped["TemplateNarrative"] = relationship(
+        back_populates='template_characters'
     )
 
 
@@ -108,15 +108,15 @@ class SessionNarrative(Base):
         nullable=False
     )
 
-    narrative_template_id: Mapped[int | None] = mapped_column(
+    template_narrative_id: Mapped[int | None] = mapped_column(
         ForeignKey(
-            "narrative_template.id",
+            "template_narrative.id",
             ondelete="SET NULL",
         ),
         nullable=True,
     )
 
-    narrative_template: Mapped["NarrativeTemplate | None"] = relationship(
+    template_narrative: Mapped["TemplateNarrative | None"] = relationship(
         back_populates="session_narratives",
     )
 
@@ -132,11 +132,11 @@ class SessionNarrative(Base):
         passive_deletes=True
     )
 
-    story_turns: Mapped[List["StoryTurn"]] = relationship(
+    session_turns: Mapped[List["SessionTurn"]] = relationship(
         back_populates="session_narrative",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        order_by="StoryTurn.turn_index"
+        order_by="SessionTurn.turn_index"
     )
 
 
@@ -194,14 +194,14 @@ class SessionCharacter(Base):
     )
 
     # Deletion policy:
-    # - A SessionCharacter must not be deleted while referenced by StoryDialogue.
+    # - A SessionCharacter must not be deleted while referenced by SessionDialogue.
     # - The database enforces this restriction through a deferred foreign key.
     # - Do not automatically delete dialogues or set their speaker_id to NULL.
     # - To remove a character referenced by existing dialogues, either remove
     #   the referencing story content explicitly or use a soft-delete strategy.
     # - Deleting the entire SessionNarrative is allowed and should cascade
     #   to its characters, turns, and dialogues.
-    dialogues: Mapped[List["StoryDialogue"]] = relationship(
+    dialogues: Mapped[List["SessionDialogue"]] = relationship(
         back_populates="speaker",
         passive_deletes="all",
     )
@@ -272,18 +272,18 @@ class SessionCharacterOpinion(Base):
     )
 
 
-class StoryTurn(Base):
-    __tablename__ = "story_turn"
+class SessionTurn(Base):
+    __tablename__ = "session_turn"
 
     __table_args__ = (
         UniqueConstraint(
             "session_narrative_id",
             "turn_index",
-            name="uq_story_turn_index",
+            name="uq_session_turn_index",
         ),
         CheckConstraint(
             "turn_index >= 0",
-            name="ck_story_turn_index",
+            name="ck_session_turn_index",
         ),
     )
 
@@ -307,14 +307,14 @@ class StoryTurn(Base):
     )
 
     session_narrative: Mapped["SessionNarrative"] = relationship(
-        back_populates="story_turns",
+        back_populates="session_turns",
     )
 
-    story_dialogues: Mapped[List["StoryDialogue"]] = relationship(
-        back_populates="story_turn",
+    session_dialogues: Mapped[List["SessionDialogue"]] = relationship(
+        back_populates="session_turn",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        order_by="StoryDialogue.position"
+        order_by="SessionDialogue.position"
     )
 
 
@@ -323,18 +323,18 @@ class DialogueType(str, Enum):
     Narration = "Narration"
 
 
-class StoryDialogue(Base):
-    __tablename__ = "story_dialogue"
+class SessionDialogue(Base):
+    __tablename__ = "session_dialogue"
 
     __table_args__ = (
         UniqueConstraint(
-            "story_turn_id",
+            "session_turn_id",
             "position",
-            name="uq_story_dialogue_position",
+            name="uq_session_dialogue_position",
         ),
         CheckConstraint(
             "position >= 0",
-            name="ck_story_dialogue_position",
+            name="ck_session_dialogue_position",
         ),
         CheckConstraint(
             """
@@ -342,7 +342,7 @@ class StoryDialogue(Base):
             OR
             (kind = 'Narration' AND speaker_id IS NULL)
             """,
-            name="ck_story_dialogue_speaker",
+            name="ck_session_dialogue_speaker",
         ),
     )
 
@@ -391,11 +391,11 @@ class StoryDialogue(Base):
         back_populates="dialogues",
     )
 
-    story_turn_id: Mapped[int] = mapped_column(
-        ForeignKey('story_turn.id', ondelete='CASCADE'),
+    session_turn_id: Mapped[int] = mapped_column(
+        ForeignKey('session_turn.id', ondelete='CASCADE'),
         nullable=False
     )
 
-    story_turn: Mapped["StoryTurn"] = relationship(
-        back_populates="story_dialogues",
+    session_turn: Mapped["SessionTurn"] = relationship(
+        back_populates="session_dialogues",
     )

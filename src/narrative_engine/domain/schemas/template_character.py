@@ -6,17 +6,17 @@ from pydantic import (
 )
 
 
-class CharacterTemplateBase(BaseModel):
+class TemplateCharacterBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     background_description: str
     initial_status: str
 
 
-class CharacterTemplateCreate(CharacterTemplateBase):
-    narrative_template_id: int
+class TemplateCharacterCreate(TemplateCharacterBase):
+    template_narrative_id: int
 
 
-class CharacterTemplateUpdate(BaseModel):
+class TemplateCharacterUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(
@@ -39,14 +39,14 @@ class CharacterTemplateUpdate(BaseModel):
         return value
 
 
-class CharacterTemplateRetrieve(CharacterTemplateBase):
+class TemplateCharacterRetrieve(TemplateCharacterBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    narrative_template_id: int
+    template_narrative_id: int
 
 
-class CharacterTemplateList(BaseModel):
+class TemplateCharacterList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int

@@ -10,14 +10,14 @@ from narrative_engine.domain.models import DialogueType
 from narrative_engine.exceptions import InvalidOperationError
 
 
-class StoryDialogueBase(BaseModel):
+class SessionDialogueBase(BaseModel):
     content: str
     position: int = Field(ge=0)
     kind: DialogueType
 
 
-class StoryDialogueCreate(StoryDialogueBase):
-    story_turn_id: int
+class SessionDialogueCreate(SessionDialogueBase):
+    session_turn_id: int
     speaker_id: int | None = None
 
     @model_validator(mode="after")
@@ -37,7 +37,7 @@ class StoryDialogueCreate(StoryDialogueBase):
         return self
 
 
-class StoryDialogueUpdate(BaseModel):
+class SessionDialogueUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     content: str | None = None
@@ -84,19 +84,19 @@ class StoryDialogueUpdate(BaseModel):
         return self
 
 
-class StoryDialogueRetrieve(StoryDialogueBase):
+class SessionDialogueRetrieve(SessionDialogueBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    story_turn_id: int
+    session_turn_id: int
     speaker_id: int | None
 
 
-class StoryDialogueList(BaseModel):
+class SessionDialogueList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    story_turn_id: int
+    session_turn_id: int
     content: str
     position: int
     kind: DialogueType

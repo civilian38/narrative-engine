@@ -5,22 +5,22 @@ from pydantic import (
     field_validator,
 )
 
-from .character_template import CharacterTemplateList
+from .template_character import TemplateCharacterList
 from .session_narrative import SessionNarrativeListBase
 
 
-class NarrativeTemplateBase(BaseModel):
+class TemplateNarrativeBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     template_description: str | None = None
     world_description: str
     initial_situation: str
 
 
-class NarrativeTemplateCreate(NarrativeTemplateBase):
+class TemplateNarrativeCreate(TemplateNarrativeBase):
     pass
 
 
-class NarrativeTemplateUpdate(BaseModel):
+class TemplateNarrativeUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(
@@ -44,12 +44,12 @@ class NarrativeTemplateUpdate(BaseModel):
         return value
 
 
-class NarrativeTemplateRetrieve(NarrativeTemplateBase):
+class TemplateNarrativeRetrieve(TemplateNarrativeBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
 
-    character_templates: list[CharacterTemplateList] = Field(
+    template_characters: list[TemplateCharacterList] = Field(
         default_factory=list
     )
 
@@ -58,7 +58,7 @@ class NarrativeTemplateRetrieve(NarrativeTemplateBase):
     )
 
 
-class NarrativeTemplateList(BaseModel):
+class TemplateNarrativeList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int

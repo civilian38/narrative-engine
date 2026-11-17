@@ -15,7 +15,7 @@ class SessionNarrativeBase(BaseModel):
 
 
 class SessionNarrativeCreate(SessionNarrativeBase):
-    narrative_template_id: int | None
+    template_narrative_id: int | None
 
 
 class SessionNarrativeUpdate(BaseModel):
@@ -45,7 +45,7 @@ class SessionNarrativeRetrieve(SessionNarrativeBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    narrative_template_id: int | None
+    template_narrative_id: int | None
 
     session_characters: list[SessionCharacterList] = Field(
         default_factory=list
@@ -60,4 +60,4 @@ class SessionNarrativeListBase(BaseModel):
 
 
 class SessionNarrativeList(SessionNarrativeListBase):
-    narrative_template_id: int | None
+    template_narrative_id: int | None

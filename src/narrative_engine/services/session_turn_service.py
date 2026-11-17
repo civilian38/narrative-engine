@@ -3,19 +3,19 @@ from sqlalchemy.orm import selectinload
 
 from narrative_engine.domain.database import Database
 from narrative_engine.domain.models import (
-    StoryDialogue,
+    SessionDialogue,
     SessionNarrative,
-    StoryTurn,
+    SessionTurn,
 )
-from narrative_engine.domain.schemas.story_turn import (
-    StoryTurnCreate,
-    StoryTurnRetrieve,
-    StoryTurnList,
-    StoryTurnUpdate,
+from narrative_engine.domain.schemas.session_turn import (
+    SessionTurnCreate,
+    SessionTurnRetrieve,
+    SessionTurnList,
+    SessionTurnUpdate,
 )
 from narrative_engine.exceptions import ResourceNotFoundError
 
-class StoryTurnService:
+class SessionTurnService:
     def __init__(self, database: Database):
         self.database = database
 
@@ -23,8 +23,8 @@ class StoryTurnService:
         self,
         session_narrative_id: int,
         user_input: str,
-        story_dialogues: list[StoryDialogue]
-    ) -> StoryTurnRetrieve:
+        session_dialogues: list[SessionDialogue]
+    ) -> SessionTurnRetrieve:
 
         with self.database.session() as session:
             session_narrative = session.get(SessionNarrative, session_narrative_id)
@@ -35,9 +35,9 @@ class StoryTurnService:
                 )
 
             next_turn_index = session.scalar(
-                select(func.max(StoryTurn.turn_index))
+                select(func.max(SessionTurn.turn_index))
                 .where(
-                    StoryTurn.session_narrative_id == session_narrative_id
+                    SessionTurn.session_narrative_id == session_narrative_id
                 )
             )
 
@@ -47,120 +47,120 @@ class StoryTurnService:
                 else 0
             )
 
-            data = StoryTurnCreate(
+            data = SessionTurnCreate(
                 turn_index=next_turn_index,
                 user_input=user_input,
                 session_narrative_id=session_narrative_id,
             )
 
-            story_turn = StoryTurn(
+            session_turn = SessionTurn(
                 **data.model_dump(),
-                story_dialogues=story_dialogues
+                session_dialogues=session_dialogues
             )
 
-            session.add(story_turn)
+            session.add(session_turn)
             session.flush()
 
-            result = StoryTurnRetrieve.model_validate(
-                story_turn
+            result = SessionTurnRetrieve.model_validate(
+                session_turn
             )
 
         return result
 
-    def get(self, id: int) -> StoryTurnRetrieve:
+    def get(self, id: int) -> SessionTurnRetrieve:
         with self.database.session() as session:
-            story_turn = session.get(
-                StoryTurn,
+            session_turn = session.get(
+                SessionTurn,
                 id,
                 options=[
-                    selectinload(StoryTurn.story_dialogues)
+                    selectinload(SessionTurn.session_dialogues)
                 ],
             )
 
-            if story_turn is None:
+            if session_turn is None:
                 raise ResourceNotFoundError(
-                    resource="StoryTurn",
+                    resource="SessionTurn",
                     resource_id=id,
                 )
 
-            return StoryTurnRetrieve.model_validate(
-                story_turn
+            return SessionTurnRetrieve.model_validate(
+                session_turn
             )
 
     def list(
             self,
             search_term: str | None = None,
             session_narrative_id: int | None = None,
-    ) -> list[StoryTurnList]:
+    ) -> list[SessionTurnList]:
 
-        statement = select(StoryTurn)
+        statement = select(SessionTurn)
 
         if session_narrative_id is not None:
             statement = statement.where(
-                StoryTurn.session_narrative_id == session_narrative_id
+                SessionTurn.session_narrative_id == session_narrative_id
             )
 
         if search_term and search_term.strip():
             statement = statement.where(
-                StoryTurn.user_input.contains(
+                SessionTurn.user_input.contains(
                     search_term.strip()
                 )
             )
 
         statement = statement.order_by(
-            StoryTurn.session_narrative_id,
-            StoryTurn.turn_index,
+            SessionTurn.session_narrative_id,
+            SessionTurn.turn_index,
         )
 
         with self.database.session() as session:
-            story_turns = session.scalars(statement).all()
+            session_turns = session.scalars(statement).all()
 
             return [
-                StoryTurnList.model_validate(story_turn)
-                for story_turn in story_turns
+                SessionTurnList.model_validate(session_turn)
+                for session_turn in session_turns
             ]
 
     def update(
             self,
             id: int,
             **kwargs,
-    ) -> StoryTurnRetrieve:
+    ) -> SessionTurnRetrieve:
 
-        data = StoryTurnUpdate(**kwargs)
+        data = SessionTurnUpdate(**kwargs)
         update_data = data.model_dump(exclude_unset=True)
 
         with self.database.session() as session:
-            story_turn = session.get(
-                StoryTurn,
+            session_turn = session.get(
+                SessionTurn,
                 id,
                 options=[
-                    selectinload(StoryTurn.story_dialogues)
+                    selectinload(SessionTurn.session_dialogues)
                 ],
             )
 
-            if story_turn is None:
+            if session_turn is None:
                 raise ResourceNotFoundError(
-                    resource="StoryTurn",
+                    resource="SessionTurn",
                     resource_id=id,
                 )
 
             for field, value in update_data.items():
-                setattr(story_turn, field, value)
+                setattr(session_turn, field, value)
 
             session.flush()
 
-            return StoryTurnRetrieve.model_validate(
-                story_turn
+            return SessionTurnRetrieve.model_validate(
+                session_turn
             )
 
     def delete(self, id: int) -> None:
         with self.database.session() as session:
-            story_turn = session.get(StoryTurn, id)
+            session_turn = session.get(SessionTurn, id)
 
-            if story_turn is None:
+            if session_turn is None:
                 raise ResourceNotFoundError(
-                    resource="StoryTurn",
+                    resource="SessionTurn",
                     resource_id=id,
                 )
 
-            session.delete(story_turn)
+            session.delete(session_turn)

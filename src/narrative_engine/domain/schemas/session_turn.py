@@ -7,19 +7,19 @@ from pydantic import (
 
 from narrative_engine.exceptions import InvalidOperationError
 
-from .story_dialogue import StoryDialogueList
+from .session_dialogue import SessionDialogueList
 
 
-class StoryTurnBase(BaseModel):
+class SessionTurnBase(BaseModel):
     turn_index: int = Field(ge=0)
     user_input: str
 
 
-class StoryTurnCreate(StoryTurnBase):
+class SessionTurnCreate(SessionTurnBase):
     session_narrative_id: int
 
 
-class StoryTurnUpdate(BaseModel):
+class SessionTurnUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user_input: str | None = None
@@ -34,18 +34,18 @@ class StoryTurnUpdate(BaseModel):
         return value
 
 
-class StoryTurnRetrieve(StoryTurnBase):
+class SessionTurnRetrieve(SessionTurnBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     session_narrative_id: int
 
-    story_dialogues: list[StoryDialogueList] = Field(
+    session_dialogues: list[SessionDialogueList] = Field(
         default_factory=list
     )
 
 
-class StoryTurnList(BaseModel):
+class SessionTurnList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
