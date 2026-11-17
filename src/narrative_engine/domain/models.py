@@ -1,8 +1,7 @@
-from datetime import datetime, timezone
 from typing import List
 from enum import Enum
 
-from sqlalchemy import String, Text, ForeignKey, DateTime, UniqueConstraint, CheckConstraint, Integer
+from sqlalchemy import String, Text, ForeignKey, Integer, UniqueConstraint, CheckConstraint, ForeignKeyConstraint
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -127,6 +126,12 @@ class SessionNarrative(Base):
         passive_deletes=True
     )
 
+    session_character_opinions: Mapped[List["SessionCharacterOpinion"]] = relationship(
+        back_populates="session_narrative",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
     story_turns: Mapped[List["StoryTurn"]] = relationship(
         back_populates="session_narrative",
         cascade="all, delete-orphan",
@@ -137,6 +142,14 @@ class SessionNarrative(Base):
 
 class SessionCharacter(Base):
     __tablename__ = "session_character"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_narrative_id",
+            "id",
+            name="uq_session_character_narrative_id"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         primary_key=True
@@ -198,11 +211,26 @@ class SessionCharacterOpinion(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "from_character_id", "to_character_id", name="uq_session_character_opinion_pair"
+            "from_character_id",
+            "to_character_id",
+            name="uq_session_character_opinion_pair"
         ),
         CheckConstraint(
-            "from_character_id != to_character_id", name="ck_session_character_opinion_no_self"
-        )
+            "from_character_id != to_character_id",
+            name="ck_session_character_opinion_no_self"
+        ),
+        ForeignKeyConstraint(
+            ["session_narrative_id", "from_character_id"],
+            ["session_character.session_narrative_id",
+             "session_character.id"],
+            name="fk_opinion_from_character_session"
+        ),
+        ForeignKeyConstraint(
+            ["session_narrative_id", "to_character_id"],
+            ["session_character.session_narrative_id",
+             "session_character.id"],
+            name="fk_opinion_to_character_session"
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -214,12 +242,16 @@ class SessionCharacterOpinion(Base):
         nullable=False
     )
 
-    from_character_id: Mapped[int] = mapped_column(
-        ForeignKey('session_character.id', ondelete='CASCADE'),
+    session_narrative_id: Mapped[int] = mapped_column(
+        ForeignKey('session_narrative.id', ondelete='CASCADE'),
         nullable=False
     )
 
-    to_character_id: Mapped[int] = mapped_column(
+    session_narrative: Mapped["SessionNarrative"] = relationship(
+        back_populates="session_character_opinions",
+    )
+
+    from_character_id: Mapped[int] = mapped_column(
         ForeignKey('session_character.id', ondelete='CASCADE'),
         nullable=False
     )
@@ -227,6 +259,11 @@ class SessionCharacterOpinion(Base):
     from_character: Mapped["SessionCharacter"] = relationship(
         back_populates="opinions_to_others",
         foreign_keys=[from_character_id],
+    )
+
+    to_character_id: Mapped[int] = mapped_column(
+        ForeignKey('session_character.id', ondelete='CASCADE'),
+        nullable=False
     )
 
     to_character: Mapped["SessionCharacter"] = relationship(

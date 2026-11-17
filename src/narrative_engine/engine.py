@@ -5,8 +5,11 @@ from narrative_engine.domain.schemas.session_character import (
     SessionCharacterRetrieve,
     SessionCharacterList,
 )
+from narrative_engine.domain.schemas.session_character_opinion import SessionCharacterOpinionRetrieve, \
+    SessionCharacterOpinionList
 from narrative_engine.domain.schemas.story_dialogue import StoryDialogueRetrieve, StoryDialogueList
 from narrative_engine.domain.schemas.story_turn import StoryTurnRetrieve, StoryTurnList
+from narrative_engine.services.session_character_opinion_service import SessionCharacterOpinionService
 from narrative_engine.services.session_character_service import SessionCharacterService
 from typing import Self
 
@@ -45,9 +48,6 @@ class NarrativeEngine:
 
     def __init__(self, db_path: str = "narrative.db") -> None:
         self.database = Database(db_path)
-        self.session_character_service = SessionCharacterService(
-            self.database
-        )
         self.narrative_template_service = NarrativeTemplateService(
             self.database
         )
@@ -56,6 +56,12 @@ class NarrativeEngine:
         )
         self.session_narrative_service = SessionNarrativeService(
             self.database
+        )
+        self.session_character_service = SessionCharacterService(
+            self.database
+        )
+        self.session_character_opinion_service = (
+            SessionCharacterOpinionService(self.database)
         )
         self.story_turn_service = StoryTurnService(
             self.database
@@ -242,6 +248,63 @@ class NarrativeEngine:
 
     def delete_session_character(self, resource_id: int) -> None:
         self.session_character_service.delete(resource_id)
+
+    # Session character opinions
+
+    def create_session_character_opinion(
+        self,
+        session_narrative_id: int,
+        from_character_id: int,
+        to_character_id: int,
+        opinion: str,
+    ) -> SessionCharacterOpinionRetrieve:
+
+        return self.session_character_opinion_service.create(
+            session_narrative_id=session_narrative_id,
+            from_character_id=from_character_id,
+            to_character_id=to_character_id,
+            opinion=opinion,
+        )
+
+    def get_session_character_opinion(
+        self,
+        resource_id: int,
+    ) -> SessionCharacterOpinionRetrieve:
+
+        return self.session_character_opinion_service.get(
+            resource_id
+        )
+
+    def list_session_character_opinions(
+        self,
+        session_narrative_id: int,
+        character_id: int | None = None,
+    ) -> list[SessionCharacterOpinionList]:
+
+        return self.session_character_opinion_service.list(
+            session_narrative_id=session_narrative_id,
+            character_id=character_id,
+        )
+
+    def update_session_character_opinion(
+        self,
+        resource_id: int,
+        **kwargs,
+    ) -> SessionCharacterOpinionRetrieve:
+
+        return self.session_character_opinion_service.update(
+            resource_id,
+            **kwargs,
+        )
+
+    def delete_session_character_opinion(
+        self,
+        resource_id: int,
+    ) -> None:
+
+        self.session_character_opinion_service.delete(
+            resource_id
+        )
 
     # Story turns
 
