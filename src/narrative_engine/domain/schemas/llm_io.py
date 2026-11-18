@@ -39,17 +39,9 @@ def get_dialogue_output_model(
         {f"ID_{item}": item for item in allowed_ids},
     )
 
-    def validate_speaker_id(value: IntEnum) -> int:
-        speaker_id = int(value)
-        if speaker_id not in allowed_ids:
-            raise InvalidOperationError(
-                f"허용되지 않은 speaker_id입니다: {speaker_id}"
-            )
-        return speaker_id
-
     SpeakerID = Annotated[
         speaker_id_enum,
-        AfterValidator(validate_speaker_id),
+        AfterValidator(lambda x: x.value),
         PlainSerializer(int, return_type=int, when_used="json"),
     ]
 
@@ -68,14 +60,10 @@ def get_dialogue_output_model(
 
 def get_dialogue_output_item(allowed_ids: list[int]):
     dialogue_output = get_dialogue_output_model(allowed_ids)
-
-    return Annotated[
-        NarrationOutput | dialogue_output,
-        Field(discriminator="kind"),
-    ]
+    return NarrationOutput | dialogue_output
 
 
-def get_dialogue_list_model(
+def get_story_creation_response_model(
     allowed_ids: list[int],
 ) -> type[BaseModel]:
     dialogue_output_item = get_dialogue_output_item(allowed_ids)
@@ -87,6 +75,10 @@ def get_dialogue_list_model(
             list[dialogue_output_item],
             Field(description="순서대로 배열된 서술과 대사. 주의: 허용된 ID값을 가진 인물 외의 대사는 서술(Narration)으로 처리할것"),
         ),
+        new_world_situation=(
+            str,
+            Field(description="이번 사건 이후 세계관의 상황")
+        )
     )
 
 
@@ -109,17 +101,9 @@ def get_opinion_alter_model(
         {f"ID_{item}": item for item in allowed_ids},
     )
 
-    def validate_target_id(value: IntEnum) -> int:
-        target_id = int(value)
-        if target_id not in allowed_id_set:
-            raise InvalidOperationError(
-                f"허용되지 않은 대상 인물 ID입니다: {target_id}"
-            )
-        return target_id
-
     TargetID = Annotated[
         target_id_enum,
-        AfterValidator(validate_target_id),
+        AfterValidator(lambda x: x.value),
         PlainSerializer(int, return_type=int, when_used="json"),
     ]
 
@@ -138,7 +122,7 @@ def get_opinion_alter_model(
             str,
             Field(
                 max_length=150,
-                description="대상 인물에 대해 새로 형성된 의견"
+                description="대상 인물에 대해 새로 형성된 의견 (공백 포함 150자 이내)",
             ),
         ),
     )
@@ -159,7 +143,7 @@ def get_opinion_alter_list_model(
     )
 
 
-def get_character_change_model(
+def get_character_change_response_model(
     session_character_ids: list[int],
 ) -> type[BaseModel]:
     opinion_alter_list = get_opinion_alter_list_model(
@@ -175,6 +159,6 @@ def get_character_change_model(
         ),
         opinion_alter=(
             opinion_alter_list,
-            Field(description="다른 인물들에 대한 의견 변경"),
+            Field(description="다른 인물들에 대한 의견 변경 목록. 의견을 변경할 필요가 있는 인물들에 대해서만 목록을 작성하라."),
         ),
     )

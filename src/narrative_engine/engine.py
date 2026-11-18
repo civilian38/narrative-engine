@@ -38,6 +38,7 @@ from narrative_engine.services.session_narrative_service import (
 from narrative_engine.services.session_dialogue_service import (
     SessionDialogueService
 )
+from narrative_engine.services.llm_service import LLMService
 from narrative_engine.services.session_turn_service import (
     SessionTurnService
 )
@@ -69,6 +70,7 @@ class NarrativeEngine:
         self.session_dialogue_service = SessionDialogueService(
             self.database
         )
+        self.llm_service = LLMService(self.database)
 
     def initialize(self) -> None:
         self.database.migrate()
