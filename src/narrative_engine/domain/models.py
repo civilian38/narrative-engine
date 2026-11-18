@@ -10,6 +10,8 @@ from sqlalchemy.orm import (
     relationship
 )
 
+from narrative_engine.exceptions import InvalidOperationError
+
 
 class Base(DeclarativeBase):
     pass
@@ -139,6 +141,15 @@ class SessionNarrative(Base):
         order_by="SessionTurn.turn_index"
     )
 
+    def to_prompt_text(self) -> str:
+        return "\n".join(
+            [
+                f"===세계관 [{self.title}] 정보===",
+                f"세계관 설정: {self.world_description}",
+                f"현재 상황: {self.situation}"
+            ]
+        )
+
 
 class SessionCharacter(Base):
     __tablename__ = "session_character"
@@ -206,6 +217,51 @@ class SessionCharacter(Base):
         passive_deletes="all",
     )
 
+    def name_id_text(self) -> str:
+        return f"{self.name}(id:{self.id})"
+
+    def to_prompt_text(
+        self,
+        opinion_to_ids: List[int] | None = None,
+        opinion_from_ids: List[int] | None = None
+    ) -> str:
+        result = [
+            f"===등장인물 {self.name_id_text()} 정보===",
+            f"배경설정: {self.background_description}",
+            f"현재 상황: {self.status}"
+        ]
+
+        if opinion_to_ids is not None:
+            to_ids_set = set(opinion_to_ids)
+            opinion_to_result = ["==다른 인물들에 대한 의견==",]
+            for opinion in self.opinions_to_others:
+                if opinion.to_character_id in to_ids_set:
+                    opinion_to_result.append(opinion.opinion_to_someone_prompt_text())
+
+            if len(opinion_to_result) < len(to_ids_set) + 1:
+                raise InvalidOperationError(
+                    f"Received invalid opinion_to_id for to_prompt_text in character {self.name}(id: {self.id})"
+                )
+
+            result += opinion_to_result
+
+        if opinion_from_ids is not None:
+            from_ids_set = set(opinion_from_ids)
+            opinion_from_result = ["==이 인물에 대한 다른 인물들의 의견==",]
+            for opinion in self.opinions_from_others:
+                if opinion.from_character_id in from_ids_set:
+                    opinion_from_result.append(opinion.opinion_from_someone_prompt_text())
+
+            if len(opinion_from_result) < len(from_ids_set) + 1:
+                raise InvalidOperationError(
+                    f"Received invalid opinion_from_id for to_prompt_text in character {self.name}(id: {self.id})"
+                )
+
+            result += opinion_from_result
+
+        return "\n".join(result)
+
+
 class SessionCharacterOpinion(Base):
     __tablename__ = "session_character_opinion"
 
@@ -271,6 +327,12 @@ class SessionCharacterOpinion(Base):
         foreign_keys=[to_character_id],
     )
 
+    def opinion_to_someone_prompt_text(self) -> str:
+        return f"{self.to_character.name_id_text()}에 대한 의견: {self.opinion}"
+
+    def opinion_from_someone_prompt_text(self) -> str:
+        return f"{self.from_character.name_id_text()}의 의견: {self.opinion}"
+
 
 class SessionTurn(Base):
     __tablename__ = "session_turn"
@@ -316,6 +378,17 @@ class SessionTurn(Base):
         passive_deletes=True,
         order_by="SessionDialogue.position"
     )
+
+    def to_prompt_text(self, include_user_input: bool = False) -> str:
+        result = [f"===Turn {self.turn_index}===",]
+
+        if include_user_input:
+            result.append(self.user_input)
+
+        for dialogue in self.session_dialogues:
+            result.append(dialogue.to_prompt_text())
+
+        return "\n".join(result)
 
 
 class DialogueType(str, Enum):
@@ -399,3 +472,10 @@ class SessionDialogue(Base):
     session_turn: Mapped["SessionTurn"] = relationship(
         back_populates="session_dialogues",
     )
+
+    def to_prompt_text(self) -> str:
+        if self.kind == DialogueType.Narration:
+            return f"[{self.content}]"
+        else:
+            assert self.speaker is not None
+            return f"[{self.speaker.name_id_text()}] {self.content}"
