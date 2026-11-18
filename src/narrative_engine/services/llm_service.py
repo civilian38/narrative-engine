@@ -54,6 +54,7 @@ class LLMService:
                 turn.to_prompt_text(include_user_input=False)
                 for turn in story.session_turns
             )
+            allowed_id_pair = str(story.get_character_name_id_pairs())
 
             sections = [
                 "아래 세계관의 현재 상태와 등장인물 정보를 바탕으로 이야기를 이어서 생성하라.",
@@ -66,6 +67,7 @@ class LLMService:
                 "대사는 {\"kind\": \"Dialogue\", \"speaker_name\": 이름, \"speaker_id\": ID, \"content\": 내용} 형식, "
                 "서술은 {\"kind\": \"Narration\", \"content\": 내용} 형식으로 작성하라. "
                 "Dialogue는 해당 발화자의 이름과 ID를 정확히 사용하고, 인물의 발화가 아닌 서술은 Narration으로 작성하라.",
+                "사용할 수 있는 ID 목록: " + allowed_id_pair
             ]
             return "\n\n".join(sections)
 

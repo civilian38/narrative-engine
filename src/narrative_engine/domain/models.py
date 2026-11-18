@@ -150,6 +150,9 @@ class SessionNarrative(Base):
             ]
         )
 
+    def get_character_name_id_pairs(self) -> list[str]:
+        return [f'{character.name_id_text()}' for character in self.session_characters]
+
 
 class SessionCharacter(Base):
     __tablename__ = "session_character"
