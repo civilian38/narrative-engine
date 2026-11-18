@@ -1,1 +1,2 @@
 DEBUG_MODE = True
+GEMINI_MODEL = "gemini-3.8-flash"
