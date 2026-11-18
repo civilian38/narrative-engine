@@ -9,6 +9,10 @@ from narrative_engine.domain.schemas.session_character_opinion import SessionCha
     SessionCharacterOpinionList
 from narrative_engine.domain.schemas.session_dialogue import SessionDialogueRetrieve, SessionDialogueList
 from narrative_engine.domain.schemas.session_turn import SessionTurnRetrieve, SessionTurnList
+from narrative_engine.domain.schemas.llm_io import (
+    CharacterUpdateResponse,
+    StoryCreationResponse,
+)
 from narrative_engine.services.session_character_opinion_service import SessionCharacterOpinionService
 from narrative_engine.services.session_character_service import SessionCharacterService
 from typing import Self
@@ -411,3 +415,45 @@ class NarrativeEngine:
         resource_id: int,
     ) -> None:
         self.session_dialogue_service.delete(resource_id)
+
+    # LLM prompts and generated results
+
+    def create_story_prompt(
+        self,
+        session_narrative_id: int,
+        user_input: str,
+    ) -> str:
+        return self.llm_service.create_story_prompt(
+            session_story_id=session_narrative_id,
+            user_input=user_input,
+        )
+
+    def push_story_creation_result(
+        self,
+        session_narrative_id: int,
+        user_input: str,
+        creation_result: StoryCreationResponse,
+    ) -> None:
+        self.llm_service.push_story_creation_result(
+            session_narrative_id=session_narrative_id,
+            user_input=user_input,
+            creation_result=creation_result,
+        )
+
+    def create_character_update_prompt(
+        self,
+        session_character_id: int,
+    ) -> str:
+        return self.llm_service.create_character_update_prompt(
+            session_character_id=session_character_id,
+        )
+
+    def push_character_update_result(
+        self,
+        session_character_id: int,
+        creation_result: CharacterUpdateResponse,
+    ) -> None:
+        self.llm_service.push_character_update_result(
+            session_character_id=session_character_id,
+            creation_result=creation_result,
+        )
