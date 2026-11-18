@@ -101,7 +101,7 @@ class OpinionAlterList(BaseModel):
     alter_data: list[OpinionAlter] = Field(description="변경할 인물 의견 목록")
 
 
-class CharacterChangeResponse(BaseModel):
+class CharacterUpdateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     new_status: str = Field(description="인물의 새 상태")
