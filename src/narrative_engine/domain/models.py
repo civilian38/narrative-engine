@@ -236,7 +236,9 @@ class SessionCharacter(Base):
     def to_prompt_text(
         self,
         opinion_to_ids: List[int] | None = None,
-        opinion_from_ids: List[int] | None = None
+        opinion_from_ids: List[int] | None = None,
+        enable_history: bool = False,
+        max_memory_length: int = -1,
     ) -> str:
         result = [
             f"===등장인물 {self.name_id_text()} 정보===",
@@ -271,6 +273,15 @@ class SessionCharacter(Base):
                 )
 
             result += opinion_from_result
+
+        if enable_history and max_memory_length != 0:
+            memories = self.session_character_memories
+            if max_memory_length > 0:
+                memories = memories[-max_memory_length:]
+
+            if memories:
+                result.append("현재까지의 기억:")
+                result.extend(memory.to_prompt_text() for memory in memories)
 
         return "\n".join(result)
 
@@ -312,6 +323,8 @@ class SessionCharacterMemory(Base):
         back_populates="session_character_memories"
     )
 
+    def to_prompt_text(self) -> str:
+        return f"Turn {self.session_turn.turn_index}: {self.memory}"
 
 
 class SessionCharacterOpinion(Base):

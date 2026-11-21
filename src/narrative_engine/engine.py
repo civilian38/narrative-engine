@@ -493,8 +493,8 @@ class NarrativeEngine:
         session_narrative_id: int,
         user_input: str,
         creation_result: StoryCreationResponse,
-    ) -> None:
-        self.llm_service.push_story_creation_result(
+    ) -> SessionTurnRetrieve:
+        return self.llm_service.push_story_creation_result(
             session_narrative_id=session_narrative_id,
             user_input=user_input,
             creation_result=creation_result,
@@ -511,9 +511,11 @@ class NarrativeEngine:
     def push_character_update_result(
         self,
         session_character_id: int,
+        session_turn_id: int,
         creation_result: CharacterUpdateResponse,
-    ) -> None:
-        self.llm_service.push_character_update_result(
+    ) -> SessionCharacterRetrieve:
+        return self.llm_service.push_character_update_result(
             session_character_id=session_character_id,
+            session_turn_id=session_turn_id,
             creation_result=creation_result,
         )

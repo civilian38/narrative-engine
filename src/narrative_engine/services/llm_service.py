@@ -7,12 +7,14 @@ from narrative_engine.domain.database import Database
 from narrative_engine.domain.models import (
     SessionCharacter,
     SessionNarrative,
-    SessionTurn, DialogueType, SessionDialogue, SessionCharacterOpinion,
+    SessionTurn, DialogueType, SessionDialogue, SessionCharacterOpinion, SessionCharacterMemory,
 )
 from narrative_engine.domain.schemas.llm_io import StoryCreationResponse, DialogueOutput, CharacterUpdateResponse
+from narrative_engine.domain.schemas.session_character import SessionCharacterRetrieve
+from narrative_engine.domain.schemas.session_character_memory import SessionCharacterMemoryCreate
 from narrative_engine.domain.schemas.session_character_opinion import SessionCharacterOpinionCreate
 from narrative_engine.domain.schemas.session_dialogue import SessionDialogueCreate
-from narrative_engine.domain.schemas.session_turn import SessionTurnCreate
+from narrative_engine.domain.schemas.session_turn import SessionTurnCreate, SessionTurnRetrieve
 from narrative_engine.exceptions import ResourceNotFoundError, InvalidOperationError
 from narrative_engine.services.session_dialogue_service import SessionDialogueService
 
@@ -84,7 +86,7 @@ class LLMService:
         session_narrative_id: int,
         user_input: str,
         creation_result: StoryCreationResponse
-    ):
+    ) -> SessionTurnRetrieve:
         with self.database.session() as session:
             story = session.get(
                 SessionNarrative,
@@ -144,6 +146,8 @@ class LLMService:
 
             story.situation = creation_result.new_world_situation
 
+            return SessionTurnRetrieve.model_validate(session_turn)
+
     def create_character_update_prompt(
         self,
         session_character_id: int,
@@ -155,6 +159,7 @@ class LLMService:
                 session_character_id,
                 options=[
                     selectinload(SessionCharacter.opinions_to_others),
+                    selectinload(SessionCharacter.session_character_memories),
                     selectinload(SessionCharacter.session_narrative).selectinload(
                         SessionNarrative.session_turns
                     ).selectinload(SessionTurn.session_dialogues),
@@ -175,6 +180,7 @@ class LLMService:
             character_text = character.to_prompt_text(
                 opinion_to_ids=other_character_ids,
                 opinion_from_ids=None,
+                enable_history=True
             )
             turns = story.session_turns
             history_parts = [
@@ -187,26 +193,29 @@ class LLMService:
                     + turns[-1].to_prompt_text(include_user_input=False)
                 )
             history_text = "\n\n".join(history_parts) or "(이전 이야기 없음)"
+            allowed_id_pair = str(story.get_character_name_id_pairs())
 
             return "\n\n".join(
                 [
-                    "아래 세계관과 이야기의 흐름을 고려하여, 지정된 인물의 관점에서 현재 상태를 갱신하라.",
+                    "아래 세계관과 이야기의 흐름을 고려하여, 지정된 인물의 관점에서 현재 상태를 갱신하고, 이 인물이 이 사건을 어떻게 기억할지를 기록하라.",
                     story.to_prompt_text(),
                     "===상태를 갱신할 등장인물===\n" + character_text,
                     "===이전 이야기===\n" + history_text,
                     "이 인물이 직접 알 수 있는 정보만 사용하라. 다른 인물들의 현재 상태나 이 인물에 대한 그들의 의견은 입력에 포함되어 있지 않으며 추측하여 상태에 추가하지 말라.\n"
-                    "출력은 JSON 객체로 작성하라: `new_status` 문자열과 `opinion_alter` 객체를 포함하고, "
+                    "출력은 JSON 객체로 작성하라: `new_status`, 'new_memory' 문자열과 `opinion_alter` 객체를 포함하고, "
                     "`opinion_alter`에는 `alter_data` 배열을 둔다. 배열에는 바뀐 의견만 "
                     "{\"target_character_name\": 이름, \"target_character_id\": ID, \"new_opinion\": 의견} 형식으로 넣어라. "
                     "바뀐 의견이 없으면 빈 배열을 사용하라.",
+                    "사용할 수 있는 ID 목록: " + allowed_id_pair
                 ]
             )
 
     def push_character_update_result(
         self,
         session_character_id: int,
+        session_turn_id: int,
         creation_result: CharacterUpdateResponse
-    ):
+    ) -> SessionCharacterRetrieve:
         with self.database.session() as session:
             character = session.get(
                 SessionCharacter,
@@ -219,6 +228,21 @@ class LLMService:
                 raise ResourceNotFoundError(
                     resource="SessionCharacter",
                     resource_id=session_character_id,
+                )
+
+            session_turn = session.get(
+                SessionTurn,
+                session_turn_id
+            )
+            if session_turn is None:
+                raise ResourceNotFoundError(
+                    resource="SessionTurn",
+                    resource_id=session_turn_id,
+                )
+
+            if character.session_narrative_id != session_turn.session_narrative.id:
+                raise InvalidOperationError(
+                    "On Push Character Update Result: Character and Turn belong to different sessions.",
                 )
 
             character.status = creation_result.new_status
@@ -245,7 +269,17 @@ class LLMService:
 
                     else:
                         raise InvalidOperationError(
-                            "Invalid character ID delivered from LLM response"
+                            "On Push Character Update Result: Invalid to_character_id delivered from LLM response"
                         )
                 else:
                     opinion_to.opinion = alter_data.new_opinion
+
+            new_memory_data = SessionCharacterMemoryCreate(
+                session_character_id=session_character_id,
+                session_turn_id=session_turn_id,
+                memory=creation_result.new_memory
+            )
+            new_memory = SessionCharacterMemory(**new_memory_data.model_dump())
+            session.add(new_memory)
+
+            SessionCharacterRetrieve.model_validate(character)

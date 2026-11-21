@@ -5,6 +5,8 @@ from pydantic import (
     Field,
     field_validator,
 )
+
+from .session_character_memory import SessionCharacterMemoryCharacterList
 from .session_character_opinion import (
     SessionCharacterOpinionToOthers,
     SessionCharacterOpinionFromOthers,
@@ -49,6 +51,10 @@ class SessionCharacterRetrieve(SessionCharacterBase):
 
     id: int
     session_narrative_id: int
+
+    character_memories: list[SessionCharacterMemoryCharacterList] = Field(
+        default_factory=list
+    )
 
     opinions_to_others: list[SessionCharacterOpinionToOthers] = Field(
         default_factory=list

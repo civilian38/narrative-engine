@@ -47,3 +47,10 @@ class SessionCharacterMemoryRetrieve(SessionCharacterMemoryBase):
 
 class SessionCharacterMemoryList(SessionCharacterMemoryRetrieve):
     pass
+
+
+class SessionCharacterMemoryCharacterList(SessionCharacterMemoryBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    session_turn_id: int
