@@ -7,6 +7,10 @@ from narrative_engine.domain.schemas.session_character import (
 )
 from narrative_engine.domain.schemas.session_character_opinion import SessionCharacterOpinionRetrieve, \
     SessionCharacterOpinionList
+from narrative_engine.domain.schemas.session_character_memory import (
+    SessionCharacterMemoryRetrieve,
+    SessionCharacterMemoryList,
+)
 from narrative_engine.domain.schemas.session_dialogue import SessionDialogueRetrieve, SessionDialogueList
 from narrative_engine.domain.schemas.session_turn import SessionTurnRetrieve, SessionTurnList
 from narrative_engine.domain.schemas.llm_io import (
@@ -14,6 +18,7 @@ from narrative_engine.domain.schemas.llm_io import (
     StoryCreationResponse,
 )
 from narrative_engine.services.session_character_opinion_service import SessionCharacterOpinionService
+from narrative_engine.services.session_character_memory_service import SessionCharacterMemoryService
 from narrative_engine.services.session_character_service import SessionCharacterService
 from typing import Self
 
@@ -67,6 +72,9 @@ class NarrativeEngine:
         )
         self.session_character_opinion_service = (
             SessionCharacterOpinionService(self.database)
+        )
+        self.session_character_memory_service = SessionCharacterMemoryService(
+            self.database
         )
         self.session_turn_service = SessionTurnService(
             self.database
@@ -311,6 +319,58 @@ class NarrativeEngine:
         self.session_character_opinion_service.delete(
             resource_id
         )
+
+    # Session character memories
+
+    def create_session_character_memory(
+        self,
+        session_character_id: int,
+        session_turn_id: int,
+        memory: str,
+    ) -> SessionCharacterMemoryRetrieve:
+        return self.session_character_memory_service.create(
+            session_character_id=session_character_id,
+            session_turn_id=session_turn_id,
+            memory=memory,
+        )
+
+    def get_session_character_memory(
+        self,
+        resource_id: int,
+    ) -> SessionCharacterMemoryRetrieve:
+        return self.session_character_memory_service.get(resource_id)
+
+    def list_session_character_memories_for_character(
+        self,
+        session_character_id: int,
+    ) -> list[SessionCharacterMemoryList]:
+        return self.session_character_memory_service.list_for_character(
+            session_character_id
+        )
+
+    def list_session_character_memories_for_turn(
+        self,
+        session_turn_id: int,
+    ) -> list[SessionCharacterMemoryList]:
+        return self.session_character_memory_service.list_for_turn(
+            session_turn_id
+        )
+
+    def update_session_character_memory(
+        self,
+        resource_id: int,
+        **kwargs,
+    ) -> SessionCharacterMemoryRetrieve:
+        return self.session_character_memory_service.update(
+            resource_id,
+            **kwargs,
+        )
+
+    def delete_session_character_memory(
+        self,
+        resource_id: int,
+    ) -> None:
+        self.session_character_memory_service.delete(resource_id)
 
     # Story turns
 

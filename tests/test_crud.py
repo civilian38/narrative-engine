@@ -100,6 +100,66 @@ def test_turn_dialogue_crud_order_and_cascades(engine):
         engine.get_session_turn(turn.id)
 
 
+def test_session_character_memory_crud_and_listing(engine):
+    template = engine.create_template_narrative("Quest", "World", "Start")
+    story = engine.create_session_narrative(template.id)
+    alice = engine.create_session_character(story.id, "Alice", "A", "Well")
+    bob = engine.create_session_character(story.id, "Bob", "B", "Well")
+    turn_one = engine.create_session_turn(story.id, "First event", [])
+    turn_two = engine.create_session_turn(story.id, "Second event", [])
+
+    alice_memory_two = engine.create_session_character_memory(
+        alice.id, turn_two.id, "Alice remembers the second event"
+    )
+    alice_memory_one = engine.create_session_character_memory(
+        alice.id, turn_one.id, "Alice remembers the first event"
+    )
+    bob_memory_one = engine.create_session_character_memory(
+        bob.id, turn_one.id, "Bob remembers the first event"
+    )
+
+    assert engine.get_session_character_memory(alice_memory_one.id).memory == (
+        "Alice remembers the first event"
+    )
+    assert [memory.id for memory in
+            engine.list_session_character_memories_for_character(alice.id)] == [
+        alice_memory_one.id,
+        alice_memory_two.id,
+    ]
+    assert [memory.id for memory in
+            engine.list_session_character_memories_for_turn(turn_one.id)] == [
+        alice_memory_one.id,
+        bob_memory_one.id,
+    ]
+    assert engine.update_session_character_memory(
+        alice_memory_two.id, memory="Alice remembers more"
+    ).memory == "Alice remembers more"
+
+    engine.delete_session_character_memory(alice_memory_two.id)
+    assert [memory.id for memory in
+            engine.list_session_character_memories_for_character(alice.id)] == [
+        alice_memory_one.id,
+    ]
+    with pytest.raises(ResourceNotFoundError):
+        engine.get_session_character_memory(alice_memory_two.id)
+
+
+def test_session_character_memory_cascades_with_turn(engine):
+    template = engine.create_template_narrative("Quest", "World", "Start")
+    story = engine.create_session_narrative(template.id)
+    character = engine.create_session_character(story.id, "Alice", "A", "Well")
+    turn = engine.create_session_turn(story.id, "An event", [])
+    memory = engine.create_session_character_memory(
+        character.id, turn.id, "A remembered event"
+    )
+
+    engine.delete_session_turn(turn.id)
+
+    assert engine.list_session_character_memories_for_character(character.id) == []
+    with pytest.raises(ResourceNotFoundError):
+        engine.get_session_character_memory(memory.id)
+
+
 def test_empty_update_is_noop_and_missing_resources_raise(engine):
     template = engine.create_template_narrative("Quest", "World", "Start")
     assert engine.update_template_narrative(template.id).name == "Quest"
