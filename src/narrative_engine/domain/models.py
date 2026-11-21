@@ -2,6 +2,7 @@ from typing import List
 from enum import Enum
 
 from sqlalchemy import String, Text, ForeignKey, Integer, UniqueConstraint, CheckConstraint, ForeignKeyConstraint
+from sqlalchemy import select
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -193,6 +194,15 @@ class SessionCharacter(Base):
         back_populates='session_characters',
     )
 
+    session_character_memories: Mapped[List["SessionCharacterMemory"]] = relationship(
+        back_populates="session_character",
+        order_by=lambda: (
+            select(SessionTurn.turn_index)
+            .where(SessionTurn.id == SessionCharacterMemory.session_turn_id)
+            .scalar_subquery()
+        )
+    )
+
     opinions_to_others: Mapped[List["SessionCharacterOpinion"]] = relationship(
         back_populates="from_character",
         foreign_keys="SessionCharacterOpinion.from_character_id",
@@ -263,6 +273,45 @@ class SessionCharacter(Base):
             result += opinion_from_result
 
         return "\n".join(result)
+
+class SessionCharacterMemory(Base):
+    __tablename__ = "session_character_memory"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_character_id",
+            "session_turn_id",
+            name="uq_character_turn_pair"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True
+    )
+
+    memory: Mapped[str] = mapped_column(
+        Text,
+        nullable=False
+    )
+
+    session_character_id: Mapped[int] = mapped_column(
+        ForeignKey('session_character.id', ondelete='CASCADE'),
+        nullable=False
+    )
+
+    session_character: Mapped["SessionCharacter"] = relationship(
+        back_populates="session_character_memories"
+    )
+
+    session_turn_id: Mapped[int] = mapped_column(
+        ForeignKey('session_turn.id', ondelete='CASCADE'),
+        nullable=False
+    )
+
+    session_turn: Mapped["SessionTurn"] = relationship(
+        back_populates="session_character_memories"
+    )
+
 
 
 class SessionCharacterOpinion(Base):
@@ -373,6 +422,12 @@ class SessionTurn(Base):
 
     session_narrative: Mapped["SessionNarrative"] = relationship(
         back_populates="session_turns",
+    )
+
+    session_character_memories: Mapped[List["SessionCharacterMemory"]] = relationship(
+        back_populates="session_turn",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     session_dialogues: Mapped[List["SessionDialogue"]] = relationship(
