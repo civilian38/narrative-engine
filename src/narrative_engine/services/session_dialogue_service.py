@@ -26,7 +26,7 @@ class SessionDialogueService:
         self.database = database
 
     @staticmethod
-    def _validate_speaker(
+    def validate_speaker(
         session: Session,
         session_turn: SessionTurn,
         speaker_id: int | None,
@@ -77,7 +77,7 @@ class SessionDialogueService:
                     resource_id=session_turn_id,
                 )
 
-            self._validate_speaker(
+            self.validate_speaker(
                 session,
                 session_turn,
                 data.speaker_id,
@@ -224,7 +224,7 @@ class SessionDialogueService:
                     resource_id=dialogue.session_turn_id,
                 )
 
-            self._validate_speaker(
+            self.validate_speaker(
                 session,
                 session_turn,
                 validated.speaker_id,

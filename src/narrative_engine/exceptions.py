@@ -24,3 +24,7 @@ class InvalidOperationError(NarrativeEngineError):
 
 class PersistenceError(NarrativeEngineError):
     """Raised when a database operation fails."""
+
+
+class OuterAPIError(NarrativeEngineError):
+    """Raised when an outer API operation fails."""

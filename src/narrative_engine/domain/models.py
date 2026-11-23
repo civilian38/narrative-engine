@@ -2,6 +2,7 @@ from typing import List
 from enum import Enum
 
 from sqlalchemy import String, Text, ForeignKey, Integer, UniqueConstraint, CheckConstraint, ForeignKeyConstraint
+from sqlalchemy import select
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -9,6 +10,8 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship
 )
+
+from narrative_engine.exceptions import InvalidOperationError
 
 
 class Base(DeclarativeBase):
@@ -139,6 +142,18 @@ class SessionNarrative(Base):
         order_by="SessionTurn.turn_index"
     )
 
+    def to_prompt_text(self) -> str:
+        return "\n".join(
+            [
+                f"===세계관 [{self.title}] 정보===",
+                f"세계관 설정: {self.world_description}",
+                f"현재 상황: {self.situation}"
+            ]
+        )
+
+    def get_character_name_id_pairs(self) -> list[str]:
+        return [f'{character.name_id_text()}' for character in self.session_characters]
+
 
 class SessionCharacter(Base):
     __tablename__ = "session_character"
@@ -179,6 +194,15 @@ class SessionCharacter(Base):
         back_populates='session_characters',
     )
 
+    session_character_memories: Mapped[List["SessionCharacterMemory"]] = relationship(
+        back_populates="session_character",
+        order_by=lambda: (
+            select(SessionTurn.turn_index)
+            .where(SessionTurn.id == SessionCharacterMemory.session_turn_id)
+            .scalar_subquery()
+        )
+    )
+
     opinions_to_others: Mapped[List["SessionCharacterOpinion"]] = relationship(
         back_populates="from_character",
         foreign_keys="SessionCharacterOpinion.from_character_id",
@@ -205,6 +229,103 @@ class SessionCharacter(Base):
         back_populates="speaker",
         passive_deletes="all",
     )
+
+    def name_id_text(self) -> str:
+        return f"{self.name}(id:{self.id})"
+
+    def to_prompt_text(
+        self,
+        opinion_to_ids: List[int] | None = None,
+        opinion_from_ids: List[int] | None = None,
+        enable_history: bool = False,
+        max_memory_length: int = -1,
+    ) -> str:
+        result = [
+            f"===등장인물 {self.name_id_text()} 정보===",
+            f"배경설정: {self.background_description}",
+            f"현재 상황: {self.status}"
+        ]
+
+        if opinion_to_ids is not None:
+            to_ids_set = set(opinion_to_ids)
+            opinion_to_result = ["==다른 인물들에 대한 의견==",]
+            for opinion in self.opinions_to_others:
+                if opinion.to_character_id in to_ids_set:
+                    opinion_to_result.append(opinion.opinion_to_someone_prompt_text())
+
+            if len(opinion_to_result) < len(to_ids_set) + 1:
+                raise InvalidOperationError(
+                    f"Received invalid opinion_to_id for to_prompt_text in character {self.name}(id: {self.id})"
+                )
+
+            result += opinion_to_result
+
+        if opinion_from_ids is not None:
+            from_ids_set = set(opinion_from_ids)
+            opinion_from_result = ["==이 인물에 대한 다른 인물들의 의견==",]
+            for opinion in self.opinions_from_others:
+                if opinion.from_character_id in from_ids_set:
+                    opinion_from_result.append(opinion.opinion_from_someone_prompt_text())
+
+            if len(opinion_from_result) < len(from_ids_set) + 1:
+                raise InvalidOperationError(
+                    f"Received invalid opinion_from_id for to_prompt_text in character {self.name}(id: {self.id})"
+                )
+
+            result += opinion_from_result
+
+        if enable_history and max_memory_length != 0:
+            memories = self.session_character_memories
+            if max_memory_length > 0:
+                memories = memories[-max_memory_length:]
+
+            if memories:
+                result.append("현재까지의 기억:")
+                result.extend(memory.to_prompt_text() for memory in memories)
+
+        return "\n".join(result)
+
+class SessionCharacterMemory(Base):
+    __tablename__ = "session_character_memory"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_character_id",
+            "session_turn_id",
+            name="uq_character_turn_pair"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True
+    )
+
+    memory: Mapped[str] = mapped_column(
+        Text,
+        nullable=False
+    )
+
+    session_character_id: Mapped[int] = mapped_column(
+        ForeignKey('session_character.id', ondelete='CASCADE'),
+        nullable=False
+    )
+
+    session_character: Mapped["SessionCharacter"] = relationship(
+        back_populates="session_character_memories"
+    )
+
+    session_turn_id: Mapped[int] = mapped_column(
+        ForeignKey('session_turn.id', ondelete='CASCADE'),
+        nullable=False
+    )
+
+    session_turn: Mapped["SessionTurn"] = relationship(
+        back_populates="session_character_memories"
+    )
+
+    def to_prompt_text(self) -> str:
+        return f"Turn {self.session_turn.turn_index}: {self.memory}"
+
 
 class SessionCharacterOpinion(Base):
     __tablename__ = "session_character_opinion"
@@ -271,6 +392,12 @@ class SessionCharacterOpinion(Base):
         foreign_keys=[to_character_id],
     )
 
+    def opinion_to_someone_prompt_text(self) -> str:
+        return f"{self.to_character.name_id_text()}에 대한 의견: {self.opinion}"
+
+    def opinion_from_someone_prompt_text(self) -> str:
+        return f"{self.from_character.name_id_text()}의 의견: {self.opinion}"
+
 
 class SessionTurn(Base):
     __tablename__ = "session_turn"
@@ -310,12 +437,29 @@ class SessionTurn(Base):
         back_populates="session_turns",
     )
 
+    session_character_memories: Mapped[List["SessionCharacterMemory"]] = relationship(
+        back_populates="session_turn",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
     session_dialogues: Mapped[List["SessionDialogue"]] = relationship(
         back_populates="session_turn",
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="SessionDialogue.position"
     )
+
+    def to_prompt_text(self, include_user_input: bool = False) -> str:
+        result = [f"===Turn {self.turn_index}===",]
+
+        if include_user_input:
+            result.append(self.user_input)
+
+        for dialogue in self.session_dialogues:
+            result.append(dialogue.to_prompt_text())
+
+        return "\n".join(result)
 
 
 class DialogueType(str, Enum):
@@ -399,3 +543,10 @@ class SessionDialogue(Base):
     session_turn: Mapped["SessionTurn"] = relationship(
         back_populates="session_dialogues",
     )
+
+    def to_prompt_text(self) -> str:
+        if self.kind == DialogueType.Narration:
+            return f"[{self.content}]"
+        else:
+            assert self.speaker is not None
+            return f"[{self.speaker.name_id_text()}] {self.content}"

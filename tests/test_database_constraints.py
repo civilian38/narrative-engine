@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from narrative_engine.domain.models import (
     DialogueType,
     SessionCharacter,
+    SessionCharacterMemory,
     SessionCharacterOpinion,
     SessionDialogue,
     SessionNarrative,
@@ -109,3 +110,60 @@ def test_character_without_dialogue_can_be_deleted(engine):
     engine.delete_session_character(alice.id)
     with pytest.raises(ResourceNotFoundError):
         engine.get_session_character(alice.id)
+
+
+def test_session_character_memories_are_ordered_by_turn_index(engine):
+    # Given
+    with engine.database.session() as session:
+        story = SessionNarrative(
+            title="Quest",
+            world_description="World",
+            situation="Start",
+        )
+        session.add(story)
+        session.flush()
+
+        character = SessionCharacter(
+            session_narrative_id=story.id,
+            name="Mira",
+            background_description="Scout",
+            status="Healthy",
+        )
+        session.add(character)
+        session.flush()
+
+        turns = [
+            SessionTurn(
+                session_narrative_id=story.id,
+                turn_index=i,
+                user_input=f"Turn {i}",
+            )
+            for i in range(3)
+        ]
+        session.add_all(turns)
+        session.flush()
+
+        # Memory를 turn_index 역순으로 저장
+        memories = [
+            SessionCharacterMemory(
+                session_character_id=character.id,
+                session_turn_id=turn.id,
+                memory=f"Memory {turn.turn_index}",
+            )
+            for turn in reversed(turns)
+        ]
+        session.add_all(memories)
+        session.flush()
+
+        character_id = character.id
+
+    # When
+    with engine.database.session() as session:
+        character = session.get(SessionCharacter, character_id)
+        actual_turn_indices = [
+            memory.session_turn.turn_index
+            for memory in character.session_character_memories
+        ]
+
+    # Then
+    assert actual_turn_indices == [0, 1, 2]
