@@ -25,6 +25,18 @@ class LLMService:
     def __init__(self, database: Database):
         self.database = database
 
+    @staticmethod
+    def allowed_id_config_generator(
+            allowed_ids: list[int] | None = None,
+    ):
+        if allowed_ids is None:
+            return None
+
+        id_set = set(allowed_ids)
+        return (
+            {"allowed_ids": id_set}
+        )
+
     def create_story_prompt(
         self,
         session_story_id: int,

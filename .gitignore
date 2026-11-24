@@ -158,3 +158,4 @@ $RECYCLE.BIN/
 
 *.db
 .env
+*.gguf

@@ -1,0 +1,87 @@
+from typing import Any
+
+from llama_cpp import Llama
+from pydantic import BaseModel, ValidationError
+
+from narrative_engine.exceptions import InvalidOperationError, OuterAPIError
+
+
+def generate_structured_response[T: BaseModel](
+    llm: Llama,
+    user_input: str,
+    response_model: type[T],
+    validation_context: Any | None = None,
+    max_retries: int = 3,
+    max_tokens: int = 128000,
+    temperature: float = 0.8,
+    repeat_penalty: float = 1.1,
+) -> T:
+    if max_retries < 0:
+        raise InvalidOperationError(
+            "max_retries should be non-negative integer"
+        )
+
+    messages = [
+        {
+            "role": "user",
+            "content": user_input
+        }
+    ]
+
+    for attempt in range(1 + max_retries):
+        try:
+            response = llm.create_chat_completion(
+                messages=messages,
+                response_format={
+                    "type": "json_object",
+                    "schema": response_model.model_json_schema(),
+                },
+                max_tokens=max_tokens,
+                temperature=temperature,
+                repeat_penalty=repeat_penalty,
+            )
+        except Exception as e:
+            raise OuterAPIError(
+                f"llama.cpp API Error: {e}"
+            ) from e
+
+        output = response["choices"][0]["message"]["content"]
+
+        if not output:
+            raise OuterAPIError(
+                "llama.cpp Response is Empty"
+            )
+
+        try:
+            return response_model.model_validate_json(output, context=validation_context)
+
+        except ValidationError as e:
+            error_summary = "; ".join(
+                f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}"
+                for err in e.errors()
+            )
+
+            if attempt == max_retries:
+                raise OuterAPIError(
+                    f"LLM 응답 검증에 최종 실패했습니다 "
+                    f"({max_retries + 1}회 시도): {error_summary}"
+                ) from e
+
+            feedback = (
+                "직전 JSON 응답이 Pydantic 검증에 실패했습니다.\n"
+                f"검증 오류: {error_summary}\n"
+                "검증 오류를 수정하여 전체 JSON을 다시 생성하세요.\n"
+                "반드시 JSON 객체만 출력하세요."
+            )
+
+            messages.append(
+                {
+                    "role": "user",
+                    "content": feedback,
+                }
+            )
+
+    raise OuterAPIError(
+        "Unexpected retry loop termination"
+    )
+

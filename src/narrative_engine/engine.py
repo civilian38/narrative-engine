@@ -1,4 +1,5 @@
 from types import TracebackType
+from llama_cpp import Llama
 
 from narrative_engine.domain.models import SessionDialogue, DialogueType
 from narrative_engine.domain.schemas.session_character import (
@@ -51,6 +52,7 @@ from narrative_engine.services.llm_service import LLMService
 from narrative_engine.services.session_turn_service import (
     SessionTurnService
 )
+from narrative_engine.config import MODEL_PATH, N_CTX
 
 
 class NarrativeEngine:
@@ -83,6 +85,12 @@ class NarrativeEngine:
             self.database
         )
         self.llm_service = LLMService(self.database)
+        self.llm = Llama(
+            model_path=MODEL_PATH,
+            n_gpu_layers=-1,
+            n_ctx=N_CTX,
+            verbose=False,
+        )
 
     def initialize(self) -> None:
         self.database.migrate()
