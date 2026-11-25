@@ -15,7 +15,7 @@ from narrative_engine.exceptions import InvalidOperationError
 def _extract_allowed_ids(info: ValidationInfo) -> set[int]:
     """Extract allowed_ids from the validation context."""
     if not info.context or "allowed_ids" not in info.context:
-        raise InvalidOperationError("검증 컨텍스트에 'allowed_ids'가 필요합니다.")
+        raise InvalidOperationError("The validation context must include 'allowed_ids'.")
     return set(info.context["allowed_ids"])
 
 
@@ -25,7 +25,7 @@ def _validate_single_allowed_id(v: int, info: ValidationInfo) -> int:
     if v not in allowed_ids:
         field_name = info.field_name or "id"
         raise ValueError(
-            f"허용되지 않은 {field_name}({v})입니다. 허용된 ID: {sorted(allowed_ids)}"
+            f"Invalid {field_name} {v}. Allowed IDs: {sorted(allowed_ids)}."
         )
     return v
 
@@ -100,7 +100,9 @@ class OpinionAlter(BaseModel):
     def validate_opinion_length(cls, v: str) -> str:
         # Validate length at the application level regardless of API JSON Schema maxLength support
         if len(v) > 150:
-            raise ValueError(f"new_opinion은 150자 이내여야 합니다. (현재 {len(v)}자)")
+            raise ValueError(
+                f"new_opinion must be at most 150 characters; received {len(v)}."
+            )
         return v
 
 

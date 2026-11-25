@@ -37,7 +37,7 @@ class SessionNarrativeUpdate(BaseModel):
     @classmethod
     def reject_none(cls, value):
         if value is None:
-            raise ValueError("Field cannot be null")
+            raise ValueError("Fields in a session narrative update cannot be null.")
         return value
 
 

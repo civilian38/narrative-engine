@@ -6,15 +6,20 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from narrative_engine.config import GEMINI_MODEL
-from narrative_engine.exceptions import InvalidOperationError, OuterAPIError
+from narrative_engine.exceptions import (
+    ConfigurationError,
+    ExternalServiceError,
+    InvalidModelResponseError,
+    InvalidOperationError,
+)
 
 
 def _validate_allowed_ids(allowed_ids: list[int]) -> set[int]:
     if not allowed_ids:
-        raise InvalidOperationError("허용된 인물 ID가 하나 이상 필요합니다.")
+        raise InvalidOperationError("At least one allowed character ID is required.")
     id_set = set(allowed_ids)
     if len(allowed_ids) != len(id_set):
-        raise InvalidOperationError("allowed_ids에 중복된 ID가 있습니다.")
+        raise InvalidOperationError("allowed_ids must not contain duplicate IDs.")
     return id_set
 
 
@@ -26,6 +31,9 @@ def generate_structured_response[T: BaseModel](
 ) -> T:
     load_dotenv()
 
+    if max_retries < 0:
+        raise InvalidOperationError("max_retries must be a non-negative integer.")
+
     valid_id_set = (
         _validate_allowed_ids(allowed_ids) if allowed_ids is not None else None
     )
@@ -33,13 +41,22 @@ def generate_structured_response[T: BaseModel](
         {"allowed_ids": valid_id_set} if valid_id_set is not None else None
     )
 
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ConfigurationError(
+            "GEMINI_API_KEY is not set. Configure it before requesting Gemini responses."
+        )
+
+    try:
+        client = genai.Client(api_key=api_key)
+    except Exception as e:
+        raise ExternalServiceError(f"Could not initialize the Gemini client: {e}") from e
     config = types.GenerateContentConfig(
         response_mime_type="application/json",
         response_json_schema=response_model.model_json_schema(),
     )
 
-    # Gemini 멀티턴 대화를 위해 Content 리스트로 관리
+    # Keep a content list for Gemini's multi-turn correction requests.
     contents: list[types.Content] = [
         types.Content(
             role="user",
@@ -48,14 +65,17 @@ def generate_structured_response[T: BaseModel](
     ]
 
     for attempt in range(max_retries + 1):
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=contents,
-            config=config,
-        )
+        try:
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=contents,
+                config=config,
+            )
+        except Exception as e:
+            raise ExternalServiceError(f"The Gemini request failed: {e}") from e
 
         if not response.text:
-            raise OuterAPIError("Gemini Response is empty")
+            raise InvalidModelResponseError("Gemini returned an empty response.")
 
         try:
             return response_model.model_validate_json(
@@ -66,11 +86,12 @@ def generate_structured_response[T: BaseModel](
             error_summary = "; ".join(err["msg"] for err in e.errors())
 
             if attempt == max_retries:
-                raise OuterAPIError(
-                    f"Gemini 응답 검증에 최종 실패했습니다 ({max_retries + 1}회 시도): {error_summary}"
+                raise InvalidModelResponseError(
+                    f"Gemini returned an invalid response after {max_retries + 1} "
+                    f"attempts: {error_summary}"
                 ) from e
 
-            # 1. 잘못된 직전 응답을 'model' 턴으로 기록
+            # Add the invalid response as a model turn.
             contents.append(
                 types.Content(
                     role="model",
@@ -78,16 +99,16 @@ def generate_structured_response[T: BaseModel](
                 )
             )
 
-            # 2. 검증 실패 사유와 허용 ID 안내를 'user' 턴으로 추가해 재요청
+            # Ask the model to correct the response and include allowed IDs.
             id_guide = (
-                f"\n반드시 허용된 ID 목록({sorted(valid_id_set)}) 내의 값만 사용하세요."
+                f"\nUse only IDs from this allowed list: {sorted(valid_id_set)}."
                 if valid_id_set is not None
                 else ""
             )
             feedback = (
-                f"직전 JSON 출력이 스키마 규칙 검증에 실패했습니다.\n"
-                f"오류 사유: {error_summary}{id_guide}\n"
-                f"규칙을 준수하여 전체 JSON을 다시 생성하세요."
+                f"The previous JSON response failed schema validation.\n"
+                f"Validation errors: {error_summary}{id_guide}\n"
+                f"Correct the errors and regenerate the complete JSON response."
             )
             contents.append(
                 types.Content(
@@ -96,4 +117,6 @@ def generate_structured_response[T: BaseModel](
                 )
             )
 
-    raise OuterAPIError("Unexpected retry loop termination")
+    raise InvalidModelResponseError(
+        "The Gemini response retry loop ended without a valid response."
+    )

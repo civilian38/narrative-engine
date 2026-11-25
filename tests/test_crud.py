@@ -163,7 +163,10 @@ def test_session_character_memory_cascades_with_turn(engine):
 def test_empty_update_is_noop_and_missing_resources_raise(engine):
     template = engine.create_template_narrative("Quest", "World", "Start")
     assert engine.update_template_narrative(template.id).name == "Quest"
-    with pytest.raises(ResourceNotFoundError):
+    with pytest.raises(
+        ResourceNotFoundError,
+        match="TemplateNarrative resource with ID 99999 was not found",
+    ):
         engine.get_template_narrative(99999)
     with pytest.raises(ResourceNotFoundError):
         engine.delete_session_narrative(99999)

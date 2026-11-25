@@ -25,13 +25,13 @@ def get_dialogue_output_model(
 ) -> type[BaseModel]:
     if not allowed_ids:
         raise InvalidOperationError(
-            "Dialogue를 생성하려면 허용된 speaker ID가 하나 이상 필요합니다."
+            "At least one allowed speaker ID is required to build the dialogue response model."
         )
 
     allowed_id_set = set(allowed_ids)
     if len(allowed_ids) != len(allowed_id_set):
         raise InvalidOperationError(
-            "allowed_ids에 중복된 ID가 있습니다."
+            "allowed_ids must not contain duplicate IDs."
         )
 
     speaker_id_enum = IntEnum(
@@ -87,12 +87,12 @@ def get_opinion_alter_model(
 ) -> type[BaseModel]:
     if not allowed_ids:
         raise InvalidOperationError(
-            "OpinionAlter를 생성하려면 허용된 대상 인물 ID가 하나 이상 필요합니다."
+            "At least one allowed target character ID is required to build the opinion response model."
         )
 
     if len(allowed_ids) != len(set(allowed_ids)):
         raise InvalidOperationError(
-            "허용된 대상 인물 ID 목록에 중복된 ID가 있습니다."
+            "The allowed target character ID list must not contain duplicate IDs."
         )
 
     allowed_id_set = set(allowed_ids)

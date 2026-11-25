@@ -148,6 +148,6 @@ class SessionCharacterService:
             )
             if referenced is not None:
                 raise InvalidOperationError(
-                    f"SessionCharacter with id={id} is referenced by SessionDialogue"
+                    f"Session character {id} cannot be deleted because a dialogue references it."
                 )
             session.delete(character)

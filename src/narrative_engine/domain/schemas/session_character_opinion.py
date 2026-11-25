@@ -5,9 +5,6 @@ from pydantic import (
     field_validator,
 )
 
-from narrative_engine.exceptions import InvalidOperationError
-
-
 class SessionCharacterOpinionBase(BaseModel):
     opinion: str = Field(min_length=1, max_length=150)
 
@@ -21,9 +18,7 @@ class SessionCharacterOpinionCreate(SessionCharacterOpinionBase):
     @classmethod
     def validate_character_id(cls, value):
         if value <= 0:
-            raise InvalidOperationError(
-                "Character ID must be positive"
-            )
+            raise ValueError("Character IDs must be positive integers.")
         return value
 
 
@@ -40,9 +35,7 @@ class SessionCharacterOpinionUpdate(BaseModel):
     @classmethod
     def reject_none(cls, value):
         if value is None:
-            raise InvalidOperationError(
-                "Field cannot be null"
-            )
+            raise ValueError("The opinion cannot be null.")
         return value
 
 

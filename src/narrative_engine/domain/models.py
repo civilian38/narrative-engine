@@ -255,7 +255,8 @@ class SessionCharacter(Base):
 
             if len(opinion_to_result) < len(to_ids_set) + 1:
                 raise InvalidOperationError(
-                    f"Received invalid opinion_to_id for to_prompt_text in character {self.name}(id: {self.id})"
+                    f"Character {self.name!r} (id={self.id}) is missing one or more "
+                    "opinions required to build its prompt."
                 )
 
             result += opinion_to_result
@@ -269,7 +270,8 @@ class SessionCharacter(Base):
 
             if len(opinion_from_result) < len(from_ids_set) + 1:
                 raise InvalidOperationError(
-                    f"Received invalid opinion_from_id for to_prompt_text in character {self.name}(id: {self.id})"
+                    f"Character {self.name!r} (id={self.id}) is missing one or more "
+                    "incoming opinions required to build its prompt."
                 )
 
             result += opinion_from_result

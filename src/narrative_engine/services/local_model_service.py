@@ -4,7 +4,12 @@ from llama_cpp import Llama
 from typing import Any, Iterator
 from pydantic import TypeAdapter, BaseModel, ValidationError
 
-from narrative_engine.exceptions import InvalidOperationError, OuterAPIError
+from narrative_engine.exceptions import (
+    ExternalServiceError,
+    InvalidModelResponseError,
+    InvalidOperationError,
+    NarrativeEngineError,
+)
 from narrative_engine.domain.schemas.llm_io import StoryContentItem
 
 
@@ -55,14 +60,14 @@ class StreamJsonParser:
             # Handle the end of an object or array.
             if c in {"}", "]"}:
                 if not self.stack:
-                    raise OuterAPIError(
+                    raise InvalidModelResponseError(
                         "Unexpected JSON closing delimiter."
                     )
 
                 expected = "{" if c == "}" else "["
 
                 if self.stack[-1][0] != expected:
-                    raise OuterAPIError(
+                    raise InvalidModelResponseError(
                         "Mismatched JSON delimiters."
                     )
 
@@ -75,7 +80,12 @@ class StreamJsonParser:
 
                 # Validate only nested objects, excluding the root object.
                 if c == "}" and self.stack:
-                    data = json.loads(popped)
+                    try:
+                        data = json.loads(popped)
+                    except json.JSONDecodeError as e:
+                        raise InvalidModelResponseError(
+                            f"The model returned malformed JSON: {e.msg} at character {e.pos}."
+                        ) from e
 
                     if isinstance(data, dict):
                         kind = data.get("kind")
@@ -87,8 +97,8 @@ class StreamJsonParser:
                                     context=validation_context,
                                 )
                             except ValidationError as e:
-                                raise OuterAPIError(
-                                    f"Invalid story content: {e}"
+                                raise InvalidModelResponseError(
+                                    f"The model returned invalid story content: {e}"
                                 ) from e
 
                 continue
@@ -99,8 +109,8 @@ class StreamJsonParser:
 
     def finish(self) -> None:
         if self.stack or self.in_string:
-            raise OuterAPIError(
-                "LLM JSON stream ended unexpectedly."
+            raise InvalidModelResponseError(
+                "The model response ended before the JSON document was complete."
             )
 
 
@@ -153,9 +163,11 @@ class LocalModelService:
 
             parser.finish()
 
+        except NarrativeEngineError:
+            raise
         except Exception as e:
-            raise OuterAPIError(
-                f"llama.cpp API Error: {e}"
+            raise ExternalServiceError(
+                f"The local model request failed: {e}"
             ) from e
 
     def get_validated_response[T: BaseModel](
@@ -165,13 +177,18 @@ class LocalModelService:
     ) -> T:
         if not self.raw_response:
             raise InvalidOperationError(
-                "chunk response not executed"
+                "No streamed model response is available. Call get_chunk_response() first."
             )
 
-        return response_model.model_validate_json(
-            "".join(self.raw_response),
-            context=validation_context
-        )
+        try:
+            return response_model.model_validate_json(
+                "".join(self.raw_response),
+                context=validation_context,
+            )
+        except ValidationError as e:
+            raise InvalidModelResponseError(
+                f"The streamed model response failed schema validation: {e}"
+            ) from e
 
 
 def generate_structured_response[T: BaseModel](
@@ -186,7 +203,7 @@ def generate_structured_response[T: BaseModel](
 ) -> T:
     if max_retries < 0:
         raise InvalidOperationError(
-            "max_retries should be non-negative integer"
+            "max_retries must be a non-negative integer."
         )
 
     messages = [
@@ -209,15 +226,15 @@ def generate_structured_response[T: BaseModel](
                 repeat_penalty=repeat_penalty,
             )
         except Exception as e:
-            raise OuterAPIError(
-                f"llama.cpp API Error: {e}"
+            raise ExternalServiceError(
+                f"The local model request failed: {e}"
             ) from e
 
         output = response["choices"][0]["message"]["content"]
 
         if not output:
-            raise OuterAPIError(
-                "llama.cpp Response is Empty"
+            raise InvalidModelResponseError(
+                "The local model returned an empty response."
             )
 
         try:
@@ -233,16 +250,16 @@ def generate_structured_response[T: BaseModel](
             )
 
             if attempt == max_retries:
-                raise OuterAPIError(
-                    f"LLM 응답 검증에 최종 실패했습니다 "
-                    f"({max_retries + 1}회 시도): {error_summary}"
+                raise InvalidModelResponseError(
+                    f"The local model returned invalid JSON after "
+                    f"{max_retries + 1} attempts: {error_summary}"
                 ) from e
 
             feedback = (
-                "직전 JSON 응답이 Pydantic 검증에 실패했습니다.\n"
-                f"검증 오류: {error_summary}\n"
-                "검증 오류를 수정하여 전체 JSON을 다시 생성하세요.\n"
-                "반드시 JSON 객체만 출력하세요."
+                "The previous JSON response failed schema validation.\n"
+                f"Validation errors: {error_summary}\n"
+                "Correct the errors and regenerate the complete response.\n"
+                "Return a JSON object only."
             )
 
             messages.append(
@@ -252,6 +269,6 @@ def generate_structured_response[T: BaseModel](
                 }
             )
 
-    raise OuterAPIError(
-        "Unexpected retry loop termination"
+    raise InvalidModelResponseError(
+        "The local model response retry loop ended without a valid response."
     )

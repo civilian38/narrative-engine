@@ -254,7 +254,7 @@ class LLMService:
 
             if character.session_narrative_id != session_turn.session_narrative.id:
                 raise InvalidOperationError(
-                    "On Push Character Update Result: Character and Turn belong to different sessions.",
+                    "The character update cannot be applied because the character and turn belong to different sessions.",
                 )
 
             character.status = creation_result.new_status
@@ -281,7 +281,8 @@ class LLMService:
 
                     else:
                         raise InvalidOperationError(
-                            "On Push Character Update Result: Invalid to_character_id delivered from LLM response"
+                            f"The model returned target character ID {alter_data.target_character_id}, "
+                            "which does not belong to the current session."
                         )
                 else:
                     opinion_to.opinion = alter_data.new_opinion

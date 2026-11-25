@@ -14,7 +14,7 @@ class ResourceNotFoundError(NarrativeEngineError):
         self.resource_id = resource_id
 
         super().__init__(
-            f"{resource} with id={resource_id} was not found"
+            f"{resource} resource with ID {resource_id} was not found."
         )
 
 
@@ -26,5 +26,17 @@ class PersistenceError(NarrativeEngineError):
     """Raised when a database operation fails."""
 
 
-class OuterAPIError(NarrativeEngineError):
-    """Raised when an outer API operation fails."""
+class ExternalServiceError(NarrativeEngineError):
+    """Raised when a configured external service cannot complete a request."""
+
+
+class InvalidModelResponseError(ExternalServiceError):
+    """Raised when an external model returns an invalid or unusable response."""
+
+
+class ConfigurationError(NarrativeEngineError):
+    """Raised when required application configuration is missing or invalid."""
+
+
+OuterAPIError = ExternalServiceError
+"""Backward-compatible alias for ExternalServiceError."""

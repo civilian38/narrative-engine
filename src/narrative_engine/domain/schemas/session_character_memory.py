@@ -5,9 +5,6 @@ from pydantic import (
     field_validator,
 )
 
-from narrative_engine.exceptions import InvalidOperationError
-
-
 class SessionCharacterMemoryBase(BaseModel):
     memory: str = Field(min_length=1)
 
@@ -20,7 +17,7 @@ class SessionCharacterMemoryCreate(SessionCharacterMemoryBase):
     @classmethod
     def validate_resource_id(cls, value: int) -> int:
         if value <= 0:
-            raise InvalidOperationError("Resource ID must be positive")
+            raise ValueError("Resource IDs must be positive integers.")
         return value
 
 
@@ -33,7 +30,7 @@ class SessionCharacterMemoryUpdate(BaseModel):
     @classmethod
     def reject_none(cls, value: str | None) -> str:
         if value is None:
-            raise InvalidOperationError("Field cannot be null")
+            raise ValueError("memory cannot be null.")
         return value
 
 

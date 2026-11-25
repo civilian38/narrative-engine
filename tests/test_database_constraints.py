@@ -96,7 +96,10 @@ def test_parent_deletes_apply_declared_cascade_and_set_null(engine):
 def test_dialogue_restricts_character_delete_until_dialogue_is_removed(engine):
     _, story, alice, _, _, turn = story_data(engine)
     dialogue = engine.create_session_dialogue(turn.id, "Hi", 0, DialogueType.Dialogue, alice.id)
-    with pytest.raises(InvalidOperationError):
+    with pytest.raises(
+        InvalidOperationError,
+        match="cannot be deleted because a dialogue references it",
+    ):
         engine.delete_session_character(alice.id)
     assert engine.get_session_character(alice.id).id == alice.id
     engine.delete_session_dialogue(dialogue.id)

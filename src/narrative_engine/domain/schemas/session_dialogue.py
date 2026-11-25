@@ -7,9 +7,6 @@ from pydantic import (
 )
 
 from narrative_engine.domain.models import DialogueType
-from narrative_engine.exceptions import InvalidOperationError
-
-
 class SessionDialogueBase(BaseModel):
     content: str
     position: int = Field(ge=0)
@@ -24,15 +21,11 @@ class SessionDialogueCreate(SessionDialogueBase):
     def validate_speaker(self):
         if self.kind == DialogueType.Dialogue:
             if self.speaker_id is None:
-                raise InvalidOperationError(
-                    "Dialogue must have a speaker"
-                )
+                raise ValueError("A dialogue must have a speaker.")
 
         elif self.kind == DialogueType.Narration:
             if self.speaker_id is not None:
-                raise InvalidOperationError(
-                    "Narration cannot have a speaker"
-                )
+                raise ValueError("Narration cannot have a speaker.")
 
         return self
 
@@ -56,9 +49,7 @@ class SessionDialogueUpdate(BaseModel):
     @classmethod
     def reject_none(cls, value):
         if value is None:
-            raise InvalidOperationError(
-                "Field cannot be null"
-            )
+            raise ValueError("This field cannot be null.")
         return value
 
     @model_validator(mode="after")
@@ -71,15 +62,11 @@ class SessionDialogueUpdate(BaseModel):
 
         if self.kind == DialogueType.Dialogue:
             if self.speaker_id is None:
-                raise InvalidOperationError(
-                    "Dialogue must have a speaker"
-                )
+                raise ValueError("A dialogue must have a speaker.")
 
         elif self.kind == DialogueType.Narration:
             if self.speaker_id is not None:
-                raise InvalidOperationError(
-                    "Narration cannot have a speaker"
-                )
+                raise ValueError("Narration cannot have a speaker.")
 
         return self
 

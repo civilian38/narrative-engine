@@ -5,8 +5,6 @@ from pydantic import (
     field_validator,
 )
 
-from narrative_engine.exceptions import InvalidOperationError
-
 from .session_dialogue import SessionDialogueList
 
 
@@ -28,9 +26,7 @@ class SessionTurnUpdate(BaseModel):
     @classmethod
     def reject_none(cls, value):
         if value is None:
-            raise InvalidOperationError(
-                "Field cannot be null"
-            )
+            raise ValueError("user_input cannot be null.")
         return value
 
 
