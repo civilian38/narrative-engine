@@ -3,6 +3,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, event
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from narrative_engine.config import DEBUG_MODE
@@ -10,9 +11,19 @@ from narrative_engine.config import DEBUG_MODE
 
 class Database:
     def __init__(self, db_path: str):
+        engine_options = {}
+        if db_path == ":memory:":
+            # Keep one in-memory SQLite database shared by worker threads.
+            # LocalModelService builds prompts with asyncio.to_thread().
+            engine_options = {
+                "connect_args": {"check_same_thread": False},
+                "poolclass": StaticPool,
+            }
+
         self.engine = create_engine(
             f"sqlite:///{db_path}",
             echo=DEBUG_MODE,
+            **engine_options,
         )
 
         @event.listens_for(self.engine, "connect")

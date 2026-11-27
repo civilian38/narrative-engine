@@ -151,7 +151,13 @@ class SessionNarrative(Base):
             ]
         )
 
-    def get_character_name_id_pairs(self) -> list[str]:
+    def get_character_name_id_pairs(self, exclude_ids: list[int] | None = None) -> list[str]:
+        if exclude_ids:
+            return [
+                f'{character.name_id_text()}'
+                for character in self.session_characters
+                if character.id not in exclude_ids
+            ]
         return [f'{character.name_id_text()}' for character in self.session_characters]
 
 

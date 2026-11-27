@@ -1,4 +1,4 @@
-from typing import cast
+from typing import cast, Any
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -39,14 +39,15 @@ class LLMService:
 
     def create_story_prompt(
         self,
-        session_story_id: int,
+        session_narrative_id: int,
         user_input: str,
-    ) -> str:
+        return_allowed_ids: bool = False,
+    ) -> tuple[list[int], str] | str:
         """Create a story-generation prompt from the current session state."""
         with self.database.session() as session:
-            story = session.get(
+            session_narrative = session.get(
                 SessionNarrative,
-                session_story_id,
+                session_narrative_id,
                 options=[
                     selectinload(SessionNarrative.session_characters).selectinload(
                         SessionCharacter.opinions_to_others
@@ -55,13 +56,13 @@ class LLMService:
                     .selectinload(SessionTurn.session_dialogues),
                 ],
             )
-            if story is None:
+            if session_narrative is None:
                 raise ResourceNotFoundError(
                     resource="SessionNarrative",
-                    resource_id=session_story_id,
+                    resource_id=session_narrative_id,
                 )
 
-            character_ids = [character.id for character in story.session_characters]
+            character_ids = [character.id for character in session_narrative.session_characters]
             character_text = "\n\n".join(
                 character.to_prompt_text(
                     opinion_to_ids=[
@@ -70,17 +71,17 @@ class LLMService:
                         if character_id != character.id
                     ]
                 )
-                for character in story.session_characters
+                for character in session_narrative.session_characters
             )
             history_text = "\n\n".join(
                 turn.to_prompt_text(include_user_input=False)
-                for turn in story.session_turns
+                for turn in session_narrative.session_turns
             )
-            allowed_id_pair = str(story.get_character_name_id_pairs())
+            allowed_id_pair = str(session_narrative.get_character_name_id_pairs())
 
             sections = [
                 "아래 세계관의 현재 상태와 등장인물 정보를 바탕으로 이야기를 이어서 생성하라.",
-                story.to_prompt_text(),
+                session_narrative.to_prompt_text(),
                 "===등장인물 현재 상태===\n" + character_text,
                 "===이전 이야기===\n" + (history_text or "(이전 이야기 없음)"),
                 "===사용자 입력===\n" + user_input,
@@ -91,6 +92,9 @@ class LLMService:
                 "Dialogue는 해당 발화자의 이름과 ID를 정확히 사용하고, 인물의 발화가 아닌 서술은 Narration으로 작성하라.",
                 "사용할 수 있는 ID 목록: " + allowed_id_pair
             ]
+
+            if return_allowed_ids:
+                return character_ids, "\n\n".join(sections)
             return "\n\n".join(sections)
 
     def push_story_creation_result(
@@ -163,7 +167,8 @@ class LLMService:
     def create_character_update_prompt(
         self,
         session_character_id: int,
-    ) -> str:
+        return_allowed_ids: bool = False,
+    ) -> tuple[list[int], str] | str:
         """Create a prompt to update one character from their perspective."""
         with self.database.session() as session:
             character = session.get(
@@ -205,9 +210,9 @@ class LLMService:
                     + turns[-1].to_prompt_text(include_user_input=False)
                 )
             history_text = "\n\n".join(history_parts) or "(이전 이야기 없음)"
-            allowed_id_pair = str(story.get_character_name_id_pairs())
+            allowed_id_pair = str(story.get_character_name_id_pairs(exclude_ids=[session_character_id,]))
 
-            return "\n\n".join(
+            return_text = "\n\n".join(
                 [
                     "아래 세계관과 이야기의 흐름을 고려하여, 지정된 인물의 관점에서 현재 상태를 갱신하고, 이 인물이 이 사건을 어떻게 기억할지를 기록하라.",
                     story.to_prompt_text(),
@@ -221,6 +226,9 @@ class LLMService:
                     "사용할 수 있는 ID 목록: " + allowed_id_pair
                 ]
             )
+            if return_allowed_ids:
+                return other_character_ids, return_text
+            return return_text
 
     def push_character_update_result(
         self,
@@ -295,4 +303,4 @@ class LLMService:
             new_memory = SessionCharacterMemory(**new_memory_data.model_dump())
             session.add(new_memory)
 
-            SessionCharacterRetrieve.model_validate(character)
+            return SessionCharacterRetrieve.model_validate(character)
